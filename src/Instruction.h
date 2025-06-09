@@ -22,8 +22,9 @@ struct Instruction {
     PlaybackStatus status;  // 添加播放状态字段
 
     // 构造函数，默认状态为未播放
-    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED) {}static std::vector<Instruction> generateInstructions(const Subject& subject);
+    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED) {}    static std::vector<Instruction> generateInstructions(const Subject& subject);
     std::string getPlayTimeString() const;
+    std::string getPlayDateTimeString() const;
     bool shouldPlayNow() const;
     
     COLORREF getStatusTextColor() const;  // 获取状态对应的文本颜色

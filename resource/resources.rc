@@ -14,7 +14,7 @@ IDI_APP_ICON   ICON    "app.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 // 对话框资源
-IDD_ADD_SUBJECT DIALOGEX 0, 0, 280, 160
+IDD_ADD_SUBJECT DIALOGEX 0, 0, 320, 180
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "添加考试科目"
 FONT 9, "MS Shell Dlg"
@@ -22,9 +22,12 @@ BEGIN
     LTEXT           "科目:", IDC_STATIC, 15, 20, 30, 12
     COMBOBOX        IDC_SUBJECT_COMBO, 50, 18, 200, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     
-    LTEXT           "开始时间 (HH:MM):", IDC_STATIC, 15, 50, 80, 12
-    EDITTEXT        IDC_START_TIME_EDIT, 100, 48, 60, 14, ES_AUTOHSCROLL
+    LTEXT           "考试日期 (YYYY-MM-DD):", IDC_STATIC, 15, 50, 100, 12
+    EDITTEXT        IDC_START_DATE_EDIT, 120, 48, 80, 14, ES_AUTOHSCROLL
     
-    DEFPUSHBUTTON   "确定", IDOK, 140, 130, 60, 16
-    PUSHBUTTON      "取消", IDCANCEL, 210, 130, 60, 16
+    LTEXT           "开始时间 (HH:MM):", IDC_STATIC, 15, 80, 80, 12
+    EDITTEXT        IDC_START_TIME_EDIT, 100, 78, 60, 14, ES_AUTOHSCROLL
+    
+    DEFPUSHBUTTON   "确定", IDOK, 180, 150, 60, 16
+    PUSHBUTTON      "取消", IDCANCEL, 250, 150, 60, 16
 END

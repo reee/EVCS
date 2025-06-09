@@ -81,6 +81,19 @@ std::string Instruction::getPlayTimeString() const {
     return ss.str();
 }
 
+std::string Instruction::getPlayDateTimeString() const {
+    auto time = std::chrono::system_clock::to_time_t(playTime);
+    std::tm tm = {};
+    localtime_s(&tm, &time);
+    std::stringstream ss;
+    ss << (tm.tm_year + 1900) << "-"
+       << std::setfill('0') << std::setw(2) << (tm.tm_mon + 1) << "-"
+       << std::setfill('0') << std::setw(2) << tm.tm_mday << " "
+       << std::setfill('0') << std::setw(2) << tm.tm_hour << ":"
+       << std::setfill('0') << std::setw(2) << tm.tm_min;
+    return ss.str();
+}
+
 bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_clock::now();
     auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - playTime).count();
     return diff >= 0 && diff < 60;  // 在当前分钟内

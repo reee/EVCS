@@ -15,10 +15,11 @@
 // 对话框控件ID
 #define IDC_STATIC            -1  // 标准静态控件ID
 #define IDC_SUBJECT_COMBO     1001
-#define IDC_START_TIME_EDIT   1002
+#define IDC_START_DATE_EDIT   1002
+#define IDC_START_TIME_EDIT   1003
 
 // Next default values for new objects
 #define _APS_NEXT_RESOURCE_VALUE    102
 #define _APS_NEXT_COMMAND_VALUE     40001
-#define _APS_NEXT_CONTROL_VALUE     1003
+#define _APS_NEXT_CONTROL_VALUE     1004
 #define _APS_NEXT_SYMED_VALUE       101

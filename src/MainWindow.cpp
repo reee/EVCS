@@ -255,16 +255,16 @@ void MainWindow::CreateControls() {
     lvc.cx = ScaleX(120);
     ListView_InsertColumn(m_hwndInstructionList, 0, &lvc);    lvc.iSubItem = 1;
     lvc.pszText = (LPWSTR)L"指令";
-    lvc.cx = ScaleX(360);  // 指令列进一步加宽到360px，最大化利用窗口空间
+    lvc.cx = ScaleX(260);  // 指令列进一步加宽到280px，最大化利用窗口空间
     ListView_InsertColumn(m_hwndInstructionList, 1, &lvc);
 
     lvc.iSubItem = 2;
     lvc.pszText = (LPWSTR)L"播放时间";
-    lvc.cx = ScaleX(140);  // 播放时间列加宽到140px (原100px)
+    lvc.cx = ScaleX(240);  // 播放时间列加宽到240px (原100px)
     ListView_InsertColumn(m_hwndInstructionList, 2, &lvc);
       lvc.iSubItem = 3;
     lvc.pszText = (LPWSTR)L"状态";
-    lvc.cx = ScaleX(120);  // 状态列加宽到120px (原80px)
+    lvc.cx = ScaleX(100);  // 状态列加宽到100px (原80px)
     ListView_InsertColumn(m_hwndInstructionList, 3, &lvc);
     
       // 应用字体到所有控件
@@ -340,9 +340,8 @@ void MainWindow::UpdateSubjectList() {
                 MultiByteToWideChar(CP_UTF8, 0, subject.name.c_str(), -1, &subjectName[0], size_needed);
             }
         }
-        
-        // 转换开始时间
-        std::string startTimeStr = subject.getStartTimeString();
+          // 转换开始时间 - 使用完整的日期时间
+        std::string startTimeStr = subject.getStartDateTimeString();
         if (!startTimeStr.empty()) {
             int size_needed = MultiByteToWideChar(CP_UTF8, 0, startTimeStr.c_str(), -1, NULL, 0);
             if (size_needed > 0) {
@@ -351,8 +350,8 @@ void MainWindow::UpdateSubjectList() {
             }
         }
         
-        // 转换结束时间
-        std::string endTimeStr = subject.getEndTimeString();
+        // 转换结束时间 - 使用完整的日期时间
+        std::string endTimeStr = subject.getEndDateTimeString();
         if (!endTimeStr.empty()) {
             int size_needed = MultiByteToWideChar(CP_UTF8, 0, endTimeStr.c_str(), -1, NULL, 0);
             if (size_needed > 0) {
@@ -407,9 +406,8 @@ void MainWindow::UpdateInstructionList() {
                 MultiByteToWideChar(CP_UTF8, 0, instruction.name.c_str(), -1, &instrName[0], size_needed);
             }
         }
-        
-        // 转换播放时间
-        std::string playTimeStr = instruction.getPlayTimeString();
+          // 转换播放时间 - 使用完整的日期时间
+        std::string playTimeStr = instruction.getPlayDateTimeString();
         if (!playTimeStr.empty()) {
             int size_needed = MultiByteToWideChar(CP_UTF8, 0, playTimeStr.c_str(), -1, NULL, 0);
             if (size_needed > 0) {
@@ -635,6 +633,7 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
             if (pMainWindow) {
                 pMainWindow->ApplyFontToControl(hwnd);  // 对话框本身
                 pMainWindow->ApplyFontToControl(hComboBox);  // 下拉列表
+                pMainWindow->ApplyFontToControl(GetDlgItem(hwnd, IDC_START_DATE_EDIT));  // 日期编辑框
                 pMainWindow->ApplyFontToControl(GetDlgItem(hwnd, IDC_START_TIME_EDIT));  // 时间编辑框
                 pMainWindow->ApplyDefaultFontToButton(GetDlgItem(hwnd, IDOK));  // 确定按钮使用默认字体
                 pMainWindow->ApplyDefaultFontToButton(GetDlgItem(hwnd, IDCANCEL));  // 取消按钮使用默认字体
@@ -643,9 +642,15 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                 HWND hStatic1 = GetDlgItem(hwnd, IDC_STATIC);
                 if (hStatic1) pMainWindow->ApplyFontToControl(hStatic1);
             }
-              // 设置默认时间为当前时间的下一个整点
+              // 设置默认日期为今天
             SYSTEMTIME st;
             GetLocalTime(&st);
+            
+            wchar_t dateStr[12];
+            swprintf_s(dateStr, _countof(dateStr), L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
+            SetDlgItemText(hwnd, IDC_START_DATE_EDIT, dateStr);
+            
+            // 设置默认时间为当前时间的下一个整点
             st.wMinute = 0;
             st.wHour = (st.wHour + 1) % 24;
             
@@ -657,9 +662,9 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
         }
         
         case WM_COMMAND: {
-            switch (LOWORD(wParam)) {
-                case IDOK: {
+            switch (LOWORD(wParam)) {                case IDOK: {
                     wchar_t subjectName[256] = {0};
+                    wchar_t startDate[12] = {0};
                     wchar_t startTime[6] = {0};
                     
                     // 获取选中的科目
@@ -671,6 +676,12 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                     }
                     SendMessageW(hComboBox, CB_GETLBTEXT, selectedIndex, (LPARAM)subjectName);
                     
+                    // 获取考试日期
+                    if (GetDlgItemTextW(hwnd, IDC_START_DATE_EDIT, startDate, 12) == 0) {
+                        MessageBoxW(hwnd, L"请输入考试日期", L"错误", MB_OK | MB_ICONERROR);
+                        return TRUE;
+                    }
+                    
                     // 获取开始时间
                     if (GetDlgItemTextW(hwnd, IDC_START_TIME_EDIT, startTime, 6) == 0) {
                         MessageBoxW(hwnd, L"请输入开始时间", L"错误", MB_OK | MB_ICONERROR);
@@ -678,28 +689,32 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                     }                    try {
                         // 使用Windows API进行字符转换 - 增加缓冲区大小以支持中文字符
                         char mbSubjectName[768] = {0};  // 增加缓冲区大小，中文字符可能需要更多字节
+                        char mbStartDate[32] = {0};     // 日期缓冲区
                         char mbStartTime[16] = {0};     // 增加时间缓冲区大小
                         
                         // 进行字符转换，并检查转换结果
                         int subjectResult = WideCharToMultiByte(CP_UTF8, 0, subjectName, -1, 
                                           mbSubjectName, sizeof(mbSubjectName), NULL, NULL);
+                        int dateResult = WideCharToMultiByte(CP_UTF8, 0, startDate, -1, 
+                                          mbStartDate, sizeof(mbStartDate), NULL, NULL);
                         int timeResult = WideCharToMultiByte(CP_UTF8, 0, startTime, -1, 
                                           mbStartTime, sizeof(mbStartTime), NULL, NULL);
                         
-                        if (subjectResult == 0 || timeResult == 0) {
+                        if (subjectResult == 0 || dateResult == 0 || timeResult == 0) {
                             MessageBoxW(hwnd, L"字符转换失败", L"错误", MB_OK | MB_ICONERROR);
                             return TRUE;
                         }
                           std::string name(mbSubjectName);
+                        std::string dateStr(mbStartDate);
                         std::string timeStr(mbStartTime);
                         
-                        if (!Subject::isValidStartTime(timeStr)) {
-                            MessageBoxW(hwnd, L"请输入正确的时间格式（HH:MM）", L"错误", MB_OK | MB_ICONERROR);
+                        if (!Subject::isValidDateTime(dateStr, timeStr)) {
+                            MessageBoxW(hwnd, L"请输入正确的日期格式（YYYY-MM-DD）和时间格式（HH:MM）", L"错误", MB_OK | MB_ICONERROR);
                             return TRUE;
                         }
                         
                         Subject subject = Subject::createSubject(name);
-                        subject.setStartTime(timeStr);
+                        subject.setStartDateTime(dateStr, timeStr);
                         
                         pMainWindow->m_subjects.push_back(subject);
                         pMainWindow->UpdateSubjectList();
