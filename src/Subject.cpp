@@ -11,7 +11,7 @@ static const std::map<std::string, std::pair<int, bool>> subjectPresets = {
     {"语文", {150, false}},
     {"数学", {120, false}},
     {"英语", {120, false}},
-    {"一上单科", {75, false}},
+    {"单科", {75, false}},
     {"首选科目", {75, false}},
     {"再选合堂", {160, true}}
 };

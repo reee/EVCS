@@ -602,7 +602,7 @@ void MainWindow::ShowSubjectContextMenu(int x, int y, int itemIndex) {
 
 INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     static const wchar_t* subjects[] = {
-        L"语文", L"数学", L"英语", L"一上单科", L"首选科目", L"再选合堂"
+        L"语文", L"数学", L"英语", L"单科", L"首选科目", L"再选合堂"
     };
     
     MainWindow* pMainWindow = nullptr;
