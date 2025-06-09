@@ -14,14 +14,15 @@ enum class PlaybackStatus {
 };
 
 struct Instruction {
-    std::string subjectName;
+    int subjectId;  // 改为使用科目ID而不是科目名称
+    std::string subjectName;  // 保留科目名称用于显示
     std::string name;
     std::chrono::system_clock::time_point playTime;
     std::string audioFile;
     PlaybackStatus status;  // 添加播放状态字段
 
     // 构造函数，默认状态为未播放
-    Instruction() : status(PlaybackStatus::UNPLAYED) {}    static std::vector<Instruction> generateInstructions(const Subject& subject);
+    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED) {}static std::vector<Instruction> generateInstructions(const Subject& subject);
     std::string getPlayTimeString() const;
     bool shouldPlayNow() const;
     

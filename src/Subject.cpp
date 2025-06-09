@@ -3,6 +3,9 @@
 #include <sstream>
 #include <iomanip>
 
+// 初始化静态ID计数器
+int Subject::nextId = 0;
+
 // 预设科目信息
 static const std::map<std::string, std::pair<int, bool>> subjectPresets = {
     {"语文", {150, false}},

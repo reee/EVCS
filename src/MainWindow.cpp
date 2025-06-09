@@ -9,11 +9,11 @@
 
 // 定义 UNICODE 版本的窗口类名和标题
 #ifdef UNICODE
-#define WINDOW_CLASS_NAME L"ExamInstruPlayerWindow"
-#define WINDOW_TITLE L"考试指令播放器"
+#define WINDOW_CLASS_NAME L"Examination Voice Command System"
+#define WINDOW_TITLE L"考试语音指令系统"
 #else
-#define WINDOW_CLASS_NAME "ExamInstruPlayerWindow"
-#define WINDOW_TITLE "考试指令播放器"
+#define WINDOW_CLASS_NAME "Examination Voice Command System"
+#define WINDOW_TITLE "考试语音指令系统"
 #endif
 
 MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), 
@@ -295,12 +295,13 @@ void MainWindow::DeleteSubject(int index) {
     }
     
     auto& subject = m_subjects[index];
+    int subjectIdToDelete = subject.id;  // 获取要删除的科目ID
     
-    // 删除相关的指令
+    // 删除相关的指令 - 使用科目ID而不是科目名称
     m_instructions.erase(
         std::remove_if(m_instructions.begin(), m_instructions.end(),
-            [&](const Instruction& instr) {
-                return instr.subjectName == subject.name;
+            [subjectIdToDelete](const Instruction& instr) {
+                return instr.subjectId == subjectIdToDelete;
             }),
         m_instructions.end()
     );

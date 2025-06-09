@@ -17,14 +17,13 @@ namespace {
         std::string strTo(size_needed - 1, 0);  // 减1去掉null终止符
         WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &strTo[0], size_needed, NULL, NULL);
         return strTo;
-    }
-
-    // 添加指令到列表的辅助函数
+    }    // 添加指令到列表的辅助函数
     void AddInstruction(std::vector<Instruction>& instructions,
                        const Subject& subject,
                        const InstructionTemplate& temp) {
         Instruction instr;
-        instr.subjectName = subject.name;
+        instr.subjectId = subject.id;  // 设置科目ID
+        instr.subjectName = subject.name;  // 保留科目名称用于显示
         instr.name = WideToUtf8(temp.name);
         instr.playTime = subject.startTime + std::chrono::minutes(temp.offsetMinutes);
         instr.audioFile = temp.file;
