@@ -21,12 +21,10 @@ private:
     HWND m_hwndInstructionList;
     std::vector<Subject> m_subjects;
     std::vector<Instruction> m_instructions;
-    
-    // DPI相关成员
+      // DPI相关成员
     UINT m_dpi;
     float m_dpiScaleX;
-    float m_dpiScaleY;    // 字体
-    HFONT m_hFont;
+    float m_dpiScaleY;
       // 指令列表状态相关
     int m_currentPlayingIndex;  // 当前播放的指令索引，-1表示没有播放
     int m_nextInstructionIndex; // 下一个要播放的指令索引，-1表示没有下一个指令
@@ -51,10 +49,10 @@ private:
     void UpdateDpiInfo();
     int ScaleX(int x) const;
     int ScaleY(int y) const;
-    void UpdateLayoutForDpi();    // 字体函数
-    void CreateFontAndBrushes();
-    void DestroyFontAndBrushes();
-    void ApplyFontToControl(HWND hwnd);
+    void UpdateLayoutForDpi();    // 字体函数（使用系统默认字体）
+    void CreateFontAndBrushes();  // 保留以兼容DPI变化处理
+    void DestroyFontAndBrushes(); // 保留以兼容现有代码
+    void ApplyFontToControl(HWND hwnd);  // 应用系统默认字体
     void ApplyDefaultFontToButton(HWND hwnd);  // 为按钮应用默认系统字体
     
     static constexpr int TIMER_ID = 1;

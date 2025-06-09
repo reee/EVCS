@@ -18,7 +18,6 @@
 
 MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), 
     m_hwndSubjectList(NULL), m_hwndInstructionList(NULL), m_dpi(96), m_dpiScaleX(1.0f), m_dpiScaleY(1.0f),
-    m_hFont(NULL), 
     m_currentPlayingIndex(-1), m_nextInstructionIndex(-1) {
     // 初始化COM
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -202,9 +201,9 @@ void MainWindow::CreateControls() {
         (HMENU)IDC_ADD_SUBJECT_BTN,
         GetModuleHandle(NULL),
         NULL
-    );// 创建科目列表 - 使用DPI缩放
+    );    // 创建科目列表 - 使用DPI缩放，添加边框
     m_hwndSubjectList = CreateWindowExW(
-        0,                   // 扩展样式
+        WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
         WC_LISTVIEWW,       // 类名
         NULL,               // 窗口文本
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SINGLESEL,  // 样式
@@ -215,28 +214,27 @@ void MainWindow::CreateControls() {
         NULL                // 额外参数
     );
     
-    // 启用完整行选择模式，这样可以更好地处理点击事件
+    // 启用完整行选择模式和网格线，添加边框效果
     ListView_SetExtendedListViewStyle(m_hwndSubjectList, 
-        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);    // 添加科目列表的列 - 调整列宽以占满整个列表 (总宽780px)
+        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_BORDERSELECT);    // 添加科目列表的列 - 调整列宽以适应实际空间 (总宽约750px)
     LVCOLUMN lvc = {0};
     lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
 
     lvc.iSubItem = 0;
     lvc.pszText = (LPWSTR)L"科目";
-    lvc.cx = ScaleX(260);  // 增加科目列宽度
+    lvc.cx = ScaleX(240);  // 调整科目列宽度为240px
     ListView_InsertColumn(m_hwndSubjectList, 0, &lvc);
 
     lvc.iSubItem = 1;
     lvc.pszText = (LPWSTR)L"开始时间";
-    lvc.cx = ScaleX(260);  // 增加开始时间列宽度
+    lvc.cx = ScaleX(250);  // 调整开始时间列宽度为250px
     ListView_InsertColumn(m_hwndSubjectList, 1, &lvc);        lvc.iSubItem = 2;
     lvc.pszText = (LPWSTR)L"结束时间";
-    lvc.cx = ScaleX(260);  // 增加结束时间列宽度
+    lvc.cx = ScaleX(250);  // 调整结束时间列宽度为250px
     ListView_InsertColumn(m_hwndSubjectList, 2, &lvc);
-    
-      // 创建指令列表 - 使用DPI缩放
+        // 创建指令列表 - 使用DPI缩放，添加边框
     m_hwndInstructionList = CreateWindowExW(
-        0,                   // 扩展样式
+        WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
         WC_LISTVIEWW,       // 类名
         NULL,               // 窗口文本
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS,  // 样式
@@ -247,28 +245,26 @@ void MainWindow::CreateControls() {
         NULL                // 额外参数
     );
     
-    // 启用完整行选择模式和网格线，提高UI一致性
+    // 启用完整行选择模式和网格线，添加边框效果
     ListView_SetExtendedListViewStyle(m_hwndInstructionList, 
-        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_BORDERSELECT);
     
     // 添加指令列表的列 - 使用DPI缩放的列宽
     lvc.iSubItem = 0;
     lvc.pszText = (LPWSTR)L"科目";
     lvc.cx = ScaleX(120);
-    ListView_InsertColumn(m_hwndInstructionList, 0, &lvc);
-
-    lvc.iSubItem = 1;
+    ListView_InsertColumn(m_hwndInstructionList, 0, &lvc);    lvc.iSubItem = 1;
     lvc.pszText = (LPWSTR)L"指令";
-    lvc.cx = ScaleX(200);
+    lvc.cx = ScaleX(360);  // 指令列进一步加宽到360px，最大化利用窗口空间
     ListView_InsertColumn(m_hwndInstructionList, 1, &lvc);
 
     lvc.iSubItem = 2;
     lvc.pszText = (LPWSTR)L"播放时间";
-    lvc.cx = ScaleX(100);
+    lvc.cx = ScaleX(140);  // 播放时间列加宽到140px (原100px)
     ListView_InsertColumn(m_hwndInstructionList, 2, &lvc);
       lvc.iSubItem = 3;
     lvc.pszText = (LPWSTR)L"状态";
-    lvc.cx = ScaleX(80);
+    lvc.cx = ScaleX(120);  // 状态列加宽到120px (原80px)
     ListView_InsertColumn(m_hwndInstructionList, 3, &lvc);
     
       // 应用字体到所有控件
@@ -634,9 +630,8 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
             for (const auto& subject : subjects) {
                 SendMessageW(hComboBox, CB_ADDSTRING, 0, (LPARAM)subject);
             }
-            SendMessageW(hComboBox, CB_SETCURSEL, 0, 0);
-              // 应用字体到对话框控件
-            if (pMainWindow && pMainWindow->m_hFont) {
+            SendMessageW(hComboBox, CB_SETCURSEL, 0, 0);            // 应用系统默认字体到对话框控件
+            if (pMainWindow) {
                 pMainWindow->ApplyFontToControl(hwnd);  // 对话框本身
                 pMainWindow->ApplyFontToControl(hComboBox);  // 下拉列表
                 pMainWindow->ApplyFontToControl(GetDlgItem(hwnd, IDC_START_TIME_EDIT));  // 时间编辑框
@@ -802,41 +797,21 @@ void MainWindow::UpdateLayoutForDpi() {
 
 // 字体管理函数
 void MainWindow::CreateFontAndBrushes() {
-    // 重新创建字体（在DPI变化时调用）
-    if (m_hFont) {
-        DeleteObject(m_hFont);
-        m_hFont = NULL;
-    }
-      // 创建更大的字体 - 基础字体大小14pt，根据DPI缩放
-    int fontSize = static_cast<int>(14 * m_dpiScaleY);
-    m_hFont = CreateFontW(
-        fontSize,                   // 字体高度
-        0,                         // 字体宽度（0表示自动）
-        0,                         // 文本角度
-        0,                         // 基线角度
-        FW_NORMAL,                 // 字体粗细
-        FALSE,                     // 斜体
-        FALSE,                     // 下划线
-        FALSE,                     // 删除线
-        DEFAULT_CHARSET,           // 字符集
-        OUT_DEFAULT_PRECIS,        // 输出精度
-        CLIP_DEFAULT_PRECIS,       // 裁剪精度
-        DEFAULT_QUALITY,           // 输出质量
-        DEFAULT_PITCH | FF_DONTCARE,  // 字体间距和族
-        L"Microsoft YaHei"         // 字体名称（使用微软雅黑）
-    );
+    // 使用系统默认字体，不需要创建自定义字体
+    // 保留此函数为了兼容性，但不执行任何操作
 }
 
 void MainWindow::DestroyFontAndBrushes() {
-    if (m_hFont) {
-        DeleteObject(m_hFont);
-        m_hFont = NULL;
-    }
+    // 使用系统默认字体，不需要销毁任何自定义字体
 }
 
 void MainWindow::ApplyFontToControl(HWND hwnd) {
-    if (hwnd && m_hFont) {
-        SendMessage(hwnd, WM_SETFONT, (WPARAM)m_hFont, TRUE);
+    if (hwnd) {
+        // 使用系统默认GUI字体
+        HFONT hDefaultFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+        if (hDefaultFont) {
+            SendMessage(hwnd, WM_SETFONT, (WPARAM)hDefaultFont, TRUE);
+        }
     }
 }
 
