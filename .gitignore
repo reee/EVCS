@@ -1,0 +1,92 @@
+# Build directories
+build/
+Debug/
+Release/
+x64/
+Win32/
+out/
+
+# Visual Studio files
+*.vcxproj.user
+*.vcxproj.filters.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.cache
+.vs/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+Makefile
+
+# Object files
+*.o
+*.obj
+*.lib
+*.dll
+*.exp
+*.pdb
+*.ilk
+*.log
+*.tlog
+*.idb
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Resource files (compiled)
+*.res
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# IDE files
+.vscode/
+*.code-workspace
+
+# System files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Package manager files
+vcpkg_installed/
+packages/
+
+# Documentation
+*.pdf
+*.doc
+*.docx
+
+# Archives
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Audio files (if not essential to the project)
+# Uncomment the following lines if audio files should not be tracked
+*.wav
+# *.mp3
+# *.ogg
+# *.flac
+
+# Log files
+*.log
+
+# Cache files
+*.cache

@@ -1,0 +1,30 @@
+#include "resource.h"
+#include <winres.h>
+#include <winuser.h>
+
+#pragma code_page(65001)  // UTF-8
+
+/////////////////////////////////////////////////////////////////////////////
+// 应用程序清单
+1 24 "app.manifest"
+
+/////////////////////////////////////////////////////////////////////////////
+// 应用程序图标
+IDI_APP_ICON   ICON    "app.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+// 对话框资源
+IDD_ADD_SUBJECT DIALOGEX 0, 0, 280, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "添加考试科目"
+FONT 9, "MS Shell Dlg"
+BEGIN
+    LTEXT           "科目:", IDC_STATIC, 15, 20, 30, 12
+    COMBOBOX        IDC_SUBJECT_COMBO, 50, 18, 200, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    
+    LTEXT           "开始时间 (HH:MM):", IDC_STATIC, 15, 50, 80, 12
+    EDITTEXT        IDC_START_TIME_EDIT, 100, 48, 60, 14, ES_AUTOHSCROLL
+    
+    DEFPUSHBUTTON   "确定", IDOK, 140, 130, 60, 16
+    PUSHBUTTON      "取消", IDCANCEL, 210, 130, 60, 16
+END
