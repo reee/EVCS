@@ -82,25 +82,9 @@ std::string Instruction::getPlayTimeString() const {
     return ss.str();
 }
 
-bool Instruction::shouldPlayNow() const {
-    auto now = std::chrono::system_clock::now();
+bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_clock::now();
     auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - playTime).count();
     return diff >= 0 && diff < 60;  // 在当前分钟内
-}
-
-COLORREF Instruction::getStatusBackgroundColor() const {
-    switch (status) {
-        case PlaybackStatus::UNPLAYED:
-            return RGB(255, 255, 255);  // 白色背景
-        case PlaybackStatus::PLAYING:
-            return RGB(144, 238, 144);  // 亮绿色背景
-        case PlaybackStatus::PLAYED:
-            return RGB(200, 255, 200);  // 浅绿色背景
-        case PlaybackStatus::SKIPPED:
-            return RGB(220, 220, 220);  // 浅灰色背景
-        default:
-            return RGB(255, 255, 255);  // 默认白色
-    }
 }
 
 COLORREF Instruction::getStatusTextColor() const {

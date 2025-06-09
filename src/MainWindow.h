@@ -25,12 +25,8 @@ private:
     // DPI相关成员
     UINT m_dpi;
     float m_dpiScaleX;
-    float m_dpiScaleY;
-      // 字体和颜色
+    float m_dpiScaleY;    // 字体
     HFONT m_hFont;
-    HBRUSH m_hBackgroundBrush;
-    HBRUSH m_hControlBrush;
-    HBRUSH m_hAlternateRowBrush;  // 条纹行画刷
       // 指令列表状态相关
     int m_currentPlayingIndex;  // 当前播放的指令索引，-1表示没有播放
     int m_nextInstructionIndex; // 下一个要播放的指令索引，-1表示没有下一个指令
@@ -46,7 +42,7 @@ private:
     void UpdateStatusBar();    // 指令播放相关方法
     void PlayInstruction(int index, bool isManualPlay = false);  // 播放指定指令
     void MarkPreviousAsSkipped(int playIndex);  // 标记之前未播放的指令为跳过
-    void UpdateInstructionListColors();  // 更新指令列表的颜色显示
+    void UpdateInstructionListDisplay();  // 更新指令列表的显示
     int FindNextUnplayedInstruction() const;  // 查找下一个未播放的指令
     int FindNextUnplayedInstructionAfter(int index) const;  // 查找指定索引之后的下一个未播放指令
     void SetNextInstruction();  // 设置下一个要播放的指令
@@ -55,8 +51,7 @@ private:
     void UpdateDpiInfo();
     int ScaleX(int x) const;
     int ScaleY(int y) const;
-    void UpdateLayoutForDpi();
-      // 字体和颜色函数
+    void UpdateLayoutForDpi();    // 字体函数
     void CreateFontAndBrushes();
     void DestroyFontAndBrushes();
     void ApplyFontToControl(HWND hwnd);

@@ -7,10 +7,10 @@
 
 // 指令播放状态枚举
 enum class PlaybackStatus {
-    UNPLAYED,   // 未播放（默认状态，白色背景）
-    PLAYING,    // 正在播放（高亮绿色背景）
-    PLAYED,     // 已播放（浅绿色背景）
-    SKIPPED     // 已跳过（浅灰色背景）
+    UNPLAYED,   // 未播放（默认状态）
+    PLAYING,    // 正在播放
+    PLAYED,     // 已播放
+    SKIPPED     // 已跳过
 };
 
 struct Instruction {
@@ -21,14 +21,10 @@ struct Instruction {
     PlaybackStatus status;  // 添加播放状态字段
 
     // 构造函数，默认状态为未播放
-    Instruction() : status(PlaybackStatus::UNPLAYED) {}
-
-    static std::vector<Instruction> generateInstructions(const Subject& subject);
+    Instruction() : status(PlaybackStatus::UNPLAYED) {}    static std::vector<Instruction> generateInstructions(const Subject& subject);
     std::string getPlayTimeString() const;
     bool shouldPlayNow() const;
     
-    // 新增方法：获取状态对应的背景颜色
-    COLORREF getStatusBackgroundColor() const;
-    COLORREF getStatusTextColor() const;  // 新增：获取状态对应的文本颜色
+    COLORREF getStatusTextColor() const;  // 获取状态对应的文本颜色
     std::string getStatusString() const;
 };

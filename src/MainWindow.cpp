@@ -18,7 +18,7 @@
 
 MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), 
     m_hwndSubjectList(NULL), m_hwndInstructionList(NULL), m_dpi(96), m_dpiScaleX(1.0f), m_dpiScaleY(1.0f),
-    m_hFont(NULL), m_hBackgroundBrush(NULL), m_hControlBrush(NULL), m_hAlternateRowBrush(NULL), 
+    m_hFont(NULL), 
     m_currentPlayingIndex(-1), m_nextInstructionIndex(-1) {
     // 初始化COM
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -103,13 +103,10 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                     return pThis->HandleInstructionListNotify(lpnmh);
                 }                return 0;
             }
-            
-            case WM_CTLCOLORBTN:
+              case WM_CTLCOLORBTN:
             case WM_CTLCOLORSTATIC: {
-                // 为按钮和静态控件设置白色背景
-                HDC hdc = (HDC)wParam;
-                // SetBkColor(hdc, RGB(255, 255, 255));
-                return (LRESULT)pThis->m_hControlBrush;
+                // 使用默认系统背景
+                return DefWindowProc(hwnd, uMsg, wParam, lParam);
             }
               case WM_COMMAND:
                 switch (LOWORD(wParam)) {                    case IDC_ADD_SUBJECT_BTN:
@@ -140,16 +137,12 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 }
 
 bool MainWindow::Create() {
-    // 先创建基本的画刷（不依赖DPI） - 使用浅灰色背景
-    m_hBackgroundBrush = CreateSolidBrush(RGB(240, 240, 240));  // 浅灰色主背景
-    m_hControlBrush = CreateSolidBrush(RGB(255, 255, 255));
-    
     WNDCLASSW wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = GetModuleHandle(NULL);
     wc.lpszClassName = WINDOW_CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = m_hBackgroundBrush;  // 使用自定义背景画刷
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     
     RegisterClassW(&wc);
     
@@ -236,16 +229,11 @@ void MainWindow::CreateControls() {
     lvc.iSubItem = 1;
     lvc.pszText = (LPWSTR)L"开始时间";
     lvc.cx = ScaleX(260);  // 增加开始时间列宽度
-    ListView_InsertColumn(m_hwndSubjectList, 1, &lvc);    
-
-    lvc.iSubItem = 2;
+    ListView_InsertColumn(m_hwndSubjectList, 1, &lvc);        lvc.iSubItem = 2;
     lvc.pszText = (LPWSTR)L"结束时间";
     lvc.cx = ScaleX(260);  // 增加结束时间列宽度
     ListView_InsertColumn(m_hwndSubjectList, 2, &lvc);
     
-    // 设置科目列表的白色背景
-    // ListView_SetBkColor(m_hwndSubjectList, RGB(255, 255, 255));
-    // ListView_SetTextBkColor(m_hwndSubjectList, RGB(255, 255, 255));
       // 创建指令列表 - 使用DPI缩放
     m_hwndInstructionList = CreateWindowExW(
         0,                   // 扩展样式
@@ -278,15 +266,11 @@ void MainWindow::CreateControls() {
     lvc.pszText = (LPWSTR)L"播放时间";
     lvc.cx = ScaleX(100);
     ListView_InsertColumn(m_hwndInstructionList, 2, &lvc);
-    
-    lvc.iSubItem = 3;
+      lvc.iSubItem = 3;
     lvc.pszText = (LPWSTR)L"状态";
     lvc.cx = ScaleX(80);
     ListView_InsertColumn(m_hwndInstructionList, 3, &lvc);
     
-    // 设置指令列表的白色背景
-    // ListView_SetBkColor(m_hwndInstructionList, RGB(255, 255, 255));
-    // ListView_SetTextBkColor(m_hwndInstructionList, RGB(255, 255, 255));
       // 应用字体到所有控件
     ApplyDefaultFontToButton(GetDlgItem(m_hwnd, IDC_ADD_SUBJECT_BTN));  // 按钮使用默认字体
     ApplyFontToControl(m_hwndSubjectList);
@@ -529,17 +513,13 @@ LRESULT MainWindow::HandleInstructionListNotify(LPNMHDR lpnmh) {
                 case CDDS_PREPAINT:
                     // 请求子项绘制通知
                     return CDRF_NOTIFYITEMDRAW;
-                    
-                case CDDS_ITEMPREPAINT: {
+                      case CDDS_ITEMPREPAINT: {
                     // 为每个项目设置文字颜色
                     int itemIndex = (int)lpCustomDraw->nmcd.dwItemSpec;
                     if (itemIndex >= 0 && static_cast<size_t>(itemIndex) < m_instructions.size()) {
                         // 获取指令状态对应的文字颜色
                         COLORREF textColor = m_instructions[itemIndex].getStatusTextColor();
                         lpCustomDraw->clrText = textColor;
-                        
-                        // 保持默认背景色（白色）
-                        lpCustomDraw->clrTextBk = RGB(255, 255, 255);
                     }
                     return CDRF_NEWFONT;
                 }
@@ -820,7 +800,7 @@ void MainWindow::UpdateLayoutForDpi() {
     SendMessage(m_hwndStatusBar, WM_SIZE, 0, 0);
 }
 
-// 字体和颜色管理函数
+// 字体管理函数
 void MainWindow::CreateFontAndBrushes() {
     // 重新创建字体（在DPI变化时调用）
     if (m_hFont) {
@@ -844,40 +824,13 @@ void MainWindow::CreateFontAndBrushes() {
         DEFAULT_QUALITY,           // 输出质量
         DEFAULT_PITCH | FF_DONTCARE,  // 字体间距和族
         L"Microsoft YaHei"         // 字体名称（使用微软雅黑）
-    );    // 创建画刷资源 - 使用统一的浅灰色配色方案
-    if (m_hBackgroundBrush) {
-        DeleteObject(m_hBackgroundBrush);
-    }
-    m_hBackgroundBrush = CreateSolidBrush(RGB(240, 240, 240));  // 统一的浅灰色主背景
-    
-    if (m_hControlBrush) {
-        DeleteObject(m_hControlBrush);
-    }
-    m_hControlBrush = CreateSolidBrush(RGB(255, 255, 255));  // 纯白色控件背景
-    
-    // 创建条纹行画刷 - 非常浅的灰色
-    if (m_hAlternateRowBrush) {
-        DeleteObject(m_hAlternateRowBrush);
-    }
-    m_hAlternateRowBrush = CreateSolidBrush(RGB(250, 250, 250));
+    );
 }
 
 void MainWindow::DestroyFontAndBrushes() {
     if (m_hFont) {
         DeleteObject(m_hFont);
         m_hFont = NULL;
-    }
-    if (m_hBackgroundBrush) {
-        DeleteObject(m_hBackgroundBrush);
-        m_hBackgroundBrush = NULL;
-    }
-    if (m_hControlBrush) {
-        DeleteObject(m_hControlBrush);
-        m_hControlBrush = NULL;
-    }
-    if (m_hAlternateRowBrush) {
-        DeleteObject(m_hAlternateRowBrush);
-        m_hAlternateRowBrush = NULL;
     }
 }
 
@@ -917,11 +870,10 @@ void MainWindow::PlayInstruction(int index, bool isManualPlay) {
     }
     
     instruction.status = PlaybackStatus::PLAYING;
-    m_currentPlayingIndex = index;
-      // 播放音频文件
+    m_currentPlayingIndex = index;    // 播放音频文件
     AudioPlayer::playAudioFile(instruction.audioFile);
       // 更新显示
-    UpdateInstructionListColors();
+    UpdateInstructionListDisplay();
     
     // 简化处理：立即标记为已播放并设置下一指令
     instruction.status = PlaybackStatus::PLAYED;
@@ -935,8 +887,7 @@ void MainWindow::PlayInstruction(int index, bool isManualPlay) {
         // 自动播放：设置为列表中第一个未播放指令
         SetNextInstruction();
     }
-    
-    UpdateInstructionListColors();
+      UpdateInstructionListDisplay();
 }
 
 void MainWindow::MarkPreviousAsSkipped(int playIndex) {
@@ -951,7 +902,7 @@ void MainWindow::MarkPreviousAsSkipped(int playIndex) {
     }
 }
 
-void MainWindow::UpdateInstructionListColors() {
+void MainWindow::UpdateInstructionListDisplay() {
     // 更新指令列表显示（包括状态文字）
     UpdateInstructionList();
     
