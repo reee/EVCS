@@ -33,11 +33,14 @@ private:
     void AddSubject();
     void DeleteSubject(int index);    void UpdateSubjectList();
     void UpdateInstructionList();    void HandleSubjectListNotify(LPNMHDR lpnmh);
-    LRESULT HandleInstructionListNotify(LPNMHDR lpnmh);
-    void ShowSubjectContextMenu(int x, int y, int itemIndex);
+    LRESULT HandleInstructionListNotify(LPNMHDR lpnmh);    void ShowSubjectContextMenu(int x, int y, int itemIndex);
     void ShowInstructionContextMenu(int x, int y, int itemIndex);  // 新增：指令右键菜单
     void UpdateNextInstruction();
-    void UpdateStatusBar();    // 指令播放相关方法
+    void UpdateStatusBar();
+    
+    // 菜单相关方法
+    void ShowHelp();     // 显示帮助信息
+    void ShowAbout();    // 显示关于对话框// 指令播放相关方法
     void PlayInstruction(int index, bool isManualPlay = false);  // 播放指定指令
     void MarkPreviousAsSkipped(int playIndex);  // 标记之前未播放的指令为跳过
     void UpdateInstructionListDisplay();  // 更新指令列表的显示

@@ -3,6 +3,9 @@
 // 对话框
 #define IDD_ADD_SUBJECT        101
 
+// 菜单资源
+#define IDR_MAIN_MENU          200
+
 // 窗口控件ID
 #define IDC_ADD_SUBJECT_BTN    2001
 #define IDC_SUBJECT_LIST       2002
@@ -11,6 +14,9 @@
 // 菜单ID
 #define IDM_DELETE_SUBJECT     3001
 #define IDM_PLAY_INSTRUCTION   3002  // 立即播放指令
+#define IDM_FILE_ADD_SUBJECT   3003  // 文件菜单 - 添加科目
+#define IDM_HELP_HELP          3004  // 帮助菜单 - 帮助
+#define IDM_HELP_ABOUT         3005  // 帮助菜单 - 关于
 
 // 对话框控件ID
 #define IDC_STATIC            -1  // 标准静态控件ID

@@ -95,9 +95,9 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             case WM_CTLCOLORSTATIC: {
                 // 使用默认系统背景
                 return DefWindowProc(hwnd, uMsg, wParam, lParam);
-            }
-              case WM_COMMAND:
-                switch (LOWORD(wParam)) {                    case IDC_ADD_SUBJECT_BTN:
+            }              case WM_COMMAND:
+                switch (LOWORD(wParam)) {
+                    case IDM_FILE_ADD_SUBJECT:
                         pThis->AddSubject();
                         return 0;
                     case IDM_DELETE_SUBJECT: {
@@ -116,6 +116,14 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                         }
                         return 0;
                     }
+                    case IDM_HELP_HELP: {
+                        pThis->ShowHelp();
+                        return 0;
+                    }
+                    case IDM_HELP_ABOUT: {
+                        pThis->ShowAbout();
+                        return 0;
+                    }
                 }
                 break;
         }
@@ -129,8 +137,8 @@ bool MainWindow::Create() {
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = GetModuleHandle(NULL);
     wc.lpszClassName = WINDOW_CLASS_NAME;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszMenuName = MAKEINTRESOURCE(IDR_MAIN_MENU);  // 加载菜单
     
     RegisterClassW(&wc);
     
@@ -146,9 +154,8 @@ bool MainWindow::Create() {
     DWORD style = WS_OVERLAPPEDWINDOW;
     // 使用DPI缩放的窗口大小
     int scaledWidth = static_cast<int>(800 * dpiScale);
-    int scaledHeight = static_cast<int>(600 * dpiScale);
-    RECT rc = { 0, 0, scaledWidth, scaledHeight };
-    AdjustWindowRect(&rc, style, FALSE);
+    int scaledHeight = static_cast<int>(600 * dpiScale);    RECT rc = { 0, 0, scaledWidth, scaledHeight };
+    AdjustWindowRect(&rc, style, TRUE);  // 传入TRUE表示有菜单
     
     m_hwnd = CreateWindowExW(
         0,                              // 扩展样式
@@ -197,36 +204,13 @@ void MainWindow::CreateControls() {
         // Part 3: Next Instruction, Width: -1 (remaining)
         int statusWidths[] = { ScaleX(120), ScaleX(370), ScaleX(570), -1 };
         SendMessage(m_hwndStatusBar, SB_SETPARTS, 4, (LPARAM)statusWidths);
-    }
-
-    // 创建"添加科目"按钮 - 使用DPI缩放
-    HWND hAddButton = CreateWindowExW(
-        0,
-        L"BUTTON",
-        L"添加科目",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        ScaleX(10), ScaleY(10), ScaleX(100), ScaleY(30),
-        m_hwnd,
-        (HMENU)IDC_ADD_SUBJECT_BTN,
-        GetModuleHandle(NULL),
-        NULL
-    );
-    
-    // 为按钮设置合适的字体
-    if (hAddButton) {
-        HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-        if (hFont) {
-            SendMessage(hAddButton, WM_SETFONT, (WPARAM)hFont, TRUE);
-        }
-    }
-
-    // 创建科目列表 - 使用DPI缩放，添加边框
+    }    // 创建科目列表 - 使用DPI缩放，添加边框
     m_hwndSubjectList = CreateWindowExW(
         WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
         WC_LISTVIEWW,       // 类名
         NULL,               // 窗口文本
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SINGLESEL,  // 样式
-        ScaleX(10), ScaleY(50), ScaleX(780), ScaleY(200),   // 位置和大小
+        ScaleX(10), ScaleY(10), ScaleX(780), ScaleY(200),   // 位置调整：从Y=50改为Y=10
         m_hwnd,             // 父窗口
         (HMENU)IDC_SUBJECT_LIST,  // 控件ID
         GetModuleHandle(NULL),    // 实例句柄
@@ -850,6 +834,49 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
     return FALSE;
 }
 
+// 菜单相关方法实现
+void MainWindow::ShowHelp() {
+    const wchar_t* helpText = 
+        L"考试语音指令系统 - 帮助\n\n"
+        L"功能说明：\n"
+        L"• 添加科目：点击\"文件\" -> \"添加科目\"菜单\n"
+        L"• 删除科目：右键点击科目列表中的项目，选择\"删除科目\"\n"
+        L"• 播放指令：双击指令列表中的项目，或右键选择\"立即播放\"\n"
+        L"• 自动播放：系统会根据设定时间自动播放相应指令\n\n"
+        L"状态栏信息：\n"
+        L"• 音量：显示当前系统音量\n"
+        L"• 音频文件：显示音频文件状态\n"
+        L"• 当前时间：显示系统当前时间\n"
+        L"• 下一指令：显示下一个将要播放的指令及倒计时\n\n"
+        L"支持的科目：\n"
+        L"• 语文 (150分钟)\n"
+        L"• 数学 (120分钟)\n"
+        L"• 英语 (120分钟)\n"
+        L"• 单科 (75分钟)\n"
+        L"• 首选科目 (75分钟)\n"
+        L"• 再选合堂 (160分钟，双场考试)";
+    
+    MessageBoxW(m_hwnd, helpText, L"帮助", MB_OK | MB_ICONINFORMATION);
+}
+
+void MainWindow::ShowAbout() {
+    const wchar_t* aboutText = 
+        L"考试语音指令系统\n"
+        L"Examination Voice Command System (EVCS)\n\n"
+        L"版本：1.0.0\n"
+        L"构建日期：2025年6月\n\n"
+        L"功能特性：\n"
+        L"• 自动语音指令播放\n"
+        L"• 多种考试科目支持\n"
+        L"• DPI缩放适配\n"
+        L"• Windows 7+ 兼容\n"
+        L"• 实时状态监控\n\n"
+        L"适用于标准化考试的语音指令播放管理。\n"
+        L"支持音频文件：WAV、MP3等格式";
+    
+    MessageBoxW(m_hwnd, aboutText, L"关于", MB_OK | MB_ICONINFORMATION);
+}
+
 // DPI相关函数实现
 void MainWindow::UpdateDpiInfo() {
     // 使用GetDeviceCaps替代GetDpiForWindow以兼容Windows 7
@@ -887,7 +914,7 @@ void MainWindow::UpdateLayoutForDpi() {
     // 获取状态栏高度
     RECT rcStatus;
     GetWindowRect(m_hwndStatusBar, &rcStatus);
-    int statusHeight = rcStatus.bottom - rcStatus.top;      // 重新设置状态栏分区宽度（使用DPI缩放）
+    int statusHeight = rcStatus.bottom - rcStatus.top;    // 重新设置状态栏分区宽度（使用DPI缩放）
     if (m_hwndStatusBar) {
         // Part 0: Volume, Width: ScaleX(120) -> Right edge: ScaleX(120)
         // Part 1: Audio File Status, Width: ScaleX(250) -> Right edge: ScaleX(120 + 250) = ScaleX(370)
@@ -897,22 +924,18 @@ void MainWindow::UpdateLayoutForDpi() {
         SendMessage(m_hwndStatusBar, SB_SETPARTS, 4, (LPARAM)statusWidths);
     }
     
-    // 使用DPI缩放的尺寸重新布局控件
-    MoveWindow(GetDlgItem(m_hwnd, IDC_ADD_SUBJECT_BTN),
-        ScaleX(10), ScaleY(10), ScaleX(100), ScaleY(30), TRUE);
-          // 计算可用高度并按比例分配：科目列表占1/3，指令列表占2/3
-    int availableHeight = rcClient.bottom - statusHeight - ScaleY(80);
+    // 计算可用高度并按比例分配：科目列表占1/3，指令列表占2/3
+    int availableHeight = rcClient.bottom - statusHeight - ScaleY(40);  // 减少边距从80到40
     int subjectListHeight = availableHeight / 3;
     int instructionListHeight = availableHeight * 2 / 3 - ScaleY(20);
-    
-    MoveWindow(m_hwndSubjectList,
-        ScaleX(10), ScaleY(50),
+      MoveWindow(m_hwndSubjectList,
+        ScaleX(10), ScaleY(10),  // 从Y=50改为Y=10
         rcClient.right - ScaleX(20),
         subjectListHeight,
         TRUE);
         
     MoveWindow(m_hwndInstructionList,
-        ScaleX(10), ScaleY(60) + subjectListHeight,
+        ScaleX(10), ScaleY(20) + subjectListHeight,  // 相应调整指令列表位置
         rcClient.right - ScaleX(20),
         instructionListHeight,
         TRUE);
