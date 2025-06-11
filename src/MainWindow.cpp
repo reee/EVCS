@@ -657,8 +657,18 @@ void MainWindow::ShowSubjectContextMenu(int x, int y, int itemIndex) {
 }
 
 INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    static const wchar_t* subjects[] = {
-        L"语文", L"数学", L"英语", L"单科", L"首选科目", L"再选合堂"
+    // 科目信息结构：名称和时长（分钟）
+    static const struct {
+        const wchar_t* name;
+        int duration;
+        bool isDoubleSession;
+    } subjects[] = {
+        {L"语文", 150, false},
+        {L"数学", 120, false},
+        {L"英语", 120, false},
+        {L"单科", 75, false},
+        {L"首选科目", 75, false},
+        {L"再选合堂", 160, true}
     };
       MainWindow* pMainWindow = nullptr;
     if (msg == WM_INITDIALOG) {
@@ -680,10 +690,18 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
     }
 
     switch (msg) {        case WM_INITDIALOG: {
-            // 初始化科目下拉列表
+            // 初始化科目下拉列表，添加时长信息
             HWND hComboBox = GetDlgItem(hwnd, IDC_SUBJECT_COMBO);
             for (const auto& subject : subjects) {
-                SendMessageW(hComboBox, CB_ADDSTRING, 0, (LPARAM)subject);
+                wchar_t displayText[128];
+                if (subject.isDoubleSession) {
+                    swprintf_s(displayText, _countof(displayText), 
+                        L"%s (%d分钟，双场考试)", subject.name, subject.duration);
+                } else {
+                    swprintf_s(displayText, _countof(displayText), 
+                        L"%s (%d分钟)", subject.name, subject.duration);
+                }
+                SendMessageW(hComboBox, CB_ADDSTRING, 0, (LPARAM)displayText);
             }            SendMessageW(hComboBox, CB_SETCURSEL, 0, 0);
               // 设置默认日期为今天
             SYSTEMTIME st;
@@ -708,15 +726,15 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
             switch (LOWORD(wParam)) {                case IDOK: {
                     wchar_t subjectName[256] = {0};
                     wchar_t startDate[12] = {0};
-                    wchar_t startTime[6] = {0};
-                      // 获取选中的科目
+                    wchar_t startTime[6] = {0};                    // 获取选中的科目
                     HWND hComboBox = GetDlgItem(hwnd, IDC_SUBJECT_COMBO);
                     int selectedIndex = static_cast<int>(SendMessageW(hComboBox, CB_GETCURSEL, 0, 0));
-                    if (selectedIndex == CB_ERR) {
+                    if (selectedIndex == CB_ERR || selectedIndex >= _countof(subjects)) {
                         MessageBoxW(hwnd, L"请选择科目", L"错误", MB_OK | MB_ICONERROR);
                         return TRUE;
                     }
-                    SendMessageW(hComboBox, CB_GETLBTEXT, selectedIndex, (LPARAM)subjectName);
+                    // 从预定义数组中获取原始科目名称
+                    wcscpy_s(subjectName, _countof(subjectName), subjects[selectedIndex].name);
                     
                     // 获取考试日期
                     if (GetDlgItemTextW(hwnd, IDC_START_DATE_EDIT, startDate, 12) == 0) {
