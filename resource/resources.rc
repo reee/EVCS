@@ -1,6 +1,5 @@
 #include "resource.h"
 #include <winres.h>
-#include <winuser.h>
 
 #pragma code_page(65001)  // UTF-8
 

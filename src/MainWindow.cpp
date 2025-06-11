@@ -46,10 +46,10 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
         pThis = (MainWindow*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
     }
     
-    if (pThis) {        switch (uMsg) {
-            case WM_CREATE:
+    if (pThis) {        switch (uMsg) {            case WM_CREATE:
                 pThis->CreateControls();
                 pThis->UpdateDpiInfo();
+                pThis->UpdateLayoutForDpi();  // 确保控件创建后立即使用正确的DPI布局
                 SetTimer(hwnd, TIMER_ID, TIMER_INTERVAL, NULL);
                 return 0;
                 
@@ -134,8 +134,20 @@ bool MainWindow::Create() {
     
     RegisterClassW(&wc);
     
+    // 在创建窗口前获取系统DPI以确定窗口大小
+    HDC hdcScreen = GetDC(NULL);
+    int systemDpi = 96; // 默认DPI
+    if (hdcScreen) {
+        systemDpi = GetDeviceCaps(hdcScreen, LOGPIXELSX);
+        ReleaseDC(NULL, hdcScreen);
+    }
+    float dpiScale = systemDpi / 96.0f;
+    
     DWORD style = WS_OVERLAPPEDWINDOW;
-    RECT rc = { 0, 0, 800, 600 };
+    // 使用DPI缩放的窗口大小
+    int scaledWidth = static_cast<int>(800 * dpiScale);
+    int scaledHeight = static_cast<int>(600 * dpiScale);
+    RECT rc = { 0, 0, scaledWidth, scaledHeight };
     AdjustWindowRect(&rc, style, FALSE);
     
     m_hwnd = CreateWindowExW(
@@ -176,7 +188,12 @@ void MainWindow::CreateControls() {
         NULL,             // 菜单
         GetModuleHandle(NULL),  // 实例句柄
         NULL              // 额外参数
-    );
+    );    // 设置状态栏的分区 - 创建3个分区：系统音量，当前时间，下一指令倒计时
+    if (m_hwndStatusBar) {
+        // 使用DPI缩放的状态栏分区宽度
+        int statusWidths[] = { ScaleX(120), ScaleX(350), -1 }; // -1表示最后一个分区占用剩余空间
+        SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
+    }
 
     // 创建"添加科目"按钮 - 使用DPI缩放
     HWND hAddButton = CreateWindowExW(
@@ -322,10 +339,55 @@ std::wstring MainWindow::ConvertUtf8ToWide(const std::string& utf8Str) {
 }
 
 void MainWindow::UpdateStatusBar() {
+    // 获取当前时间
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    wchar_t currentTimeText[64];
+    swprintf_s(currentTimeText, _countof(currentTimeText), 
+        L"当前时间: %02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
+    
+    // 计算下一指令播放倒计时
+    wchar_t nextInstructionText[256] = L"下一指令: 无";
+    if (m_nextInstructionIndex >= 0 && 
+        static_cast<size_t>(m_nextInstructionIndex) < m_instructions.size()) {
+        
+        const auto& instruction = m_instructions[m_nextInstructionIndex];
+        
+        // 只有未播放的指令才显示倒计时
+        if (instruction.status == PlaybackStatus::UNPLAYED) {
+            auto now = std::chrono::system_clock::now();
+            auto nowTime = std::chrono::system_clock::to_time_t(now);
+            auto instrTime = std::chrono::system_clock::to_time_t(instruction.playTime);
+            
+            int timeDiffMinutes = static_cast<int>((instrTime - nowTime) / 60);
+            
+            if (timeDiffMinutes > 0) {
+                // 距离播放时间还有分钟数
+                swprintf_s(nextInstructionText, _countof(nextInstructionText), 
+                    L"下一指令: %s (%d分钟后)", 
+                    ConvertUtf8ToWide(instruction.name).c_str(), timeDiffMinutes);
+            } else if (timeDiffMinutes == 0) {
+                // 即将播放
+                swprintf_s(nextInstructionText, _countof(nextInstructionText), 
+                    L"下一指令: %s (即将播放)", 
+                    ConvertUtf8ToWide(instruction.name).c_str());
+            } else {
+                // 已到播放时间
+                swprintf_s(nextInstructionText, _countof(nextInstructionText), 
+                    L"下一指令: %s (播放时间已到)", 
+                    ConvertUtf8ToWide(instruction.name).c_str());
+            }
+        }
+    }
+      // 获取系统音量
     int volume = AudioPlayer::getSystemVolume();
-    wchar_t statusText[256];
-    swprintf_s(statusText, _countof(statusText), L"系统音量: %d%%", volume);
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 0, (LPARAM)statusText);
+    wchar_t volumeText[64];
+    swprintf_s(volumeText, _countof(volumeText), L"音量: %d%%", volume);
+    
+    // 设置状态栏的各个分区文本
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 0, (LPARAM)volumeText);           // 分区0: 系统音量
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 1, (LPARAM)currentTimeText);      // 分区1: 当前时间
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 2, (LPARAM)nextInstructionText);  // 分区2: 下一指令倒计时
 }
 
 void MainWindow::UpdateSubjectList() {
@@ -647,10 +709,9 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                     wchar_t subjectName[256] = {0};
                     wchar_t startDate[12] = {0};
                     wchar_t startTime[6] = {0};
-                    
-                    // 获取选中的科目
+                      // 获取选中的科目
                     HWND hComboBox = GetDlgItem(hwnd, IDC_SUBJECT_COMBO);
-                    int selectedIndex = SendMessageW(hComboBox, CB_GETCURSEL, 0, 0);
+                    int selectedIndex = static_cast<int>(SendMessageW(hComboBox, CB_GETCURSEL, 0, 0));
                     if (selectedIndex == CB_ERR) {
                         MessageBoxW(hwnd, L"请选择科目", L"错误", MB_OK | MB_ICONERROR);
                         return TRUE;
@@ -759,6 +820,13 @@ void MainWindow::UpdateDpiInfo() {
     }
     m_dpiScaleX = m_dpi / 96.0f;
     m_dpiScaleY = m_dpi / 96.0f;
+    
+    // 调试输出DPI信息
+    wchar_t debugMsg[256];
+    swprintf_s(debugMsg, _countof(debugMsg), 
+        L"DPI: %d, ScaleX: %.2f, ScaleY: %.2f", m_dpi, m_dpiScaleX, m_dpiScaleY);
+    OutputDebugStringW(debugMsg);
+    OutputDebugStringW(L"\n");
 }
 
 int MainWindow::ScaleX(int x) const {
@@ -777,23 +845,46 @@ void MainWindow::UpdateLayoutForDpi() {
     // 获取状态栏高度
     RECT rcStatus;
     GetWindowRect(m_hwndStatusBar, &rcStatus);
-    int statusHeight = rcStatus.bottom - rcStatus.top;
+    int statusHeight = rcStatus.bottom - rcStatus.top;      // 重新设置状态栏分区宽度（使用DPI缩放）
+    if (m_hwndStatusBar) {
+        int statusWidths[] = { ScaleX(120), ScaleX(350), -1 };
+        SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
+    }
     
     // 使用DPI缩放的尺寸重新布局控件
     MoveWindow(GetDlgItem(m_hwnd, IDC_ADD_SUBJECT_BTN),
         ScaleX(10), ScaleY(10), ScaleX(100), ScaleY(30), TRUE);
-        
+          // 计算可用高度并按比例分配：科目列表占1/3，指令列表占2/3
+    int availableHeight = rcClient.bottom - statusHeight - ScaleY(80);
+    int subjectListHeight = availableHeight / 3;
+    int instructionListHeight = availableHeight * 2 / 3 - ScaleY(20);
+    
     MoveWindow(m_hwndSubjectList,
         ScaleX(10), ScaleY(50),
         rcClient.right - ScaleX(20),
-        (rcClient.bottom - statusHeight - ScaleY(80)) / 2,
+        subjectListHeight,
         TRUE);
         
     MoveWindow(m_hwndInstructionList,
-        ScaleX(10), ScaleY(60) + (rcClient.bottom - statusHeight - ScaleY(80)) / 2,
+        ScaleX(10), ScaleY(60) + subjectListHeight,
         rcClient.right - ScaleX(20),
-        (rcClient.bottom - statusHeight - ScaleY(100)) / 2,
+        instructionListHeight,
         TRUE);
+    
+    // 重新设置科目列表的列宽（使用DPI缩放）
+    if (m_hwndSubjectList) {
+        ListView_SetColumnWidth(m_hwndSubjectList, 0, ScaleX(240));  // 科目列
+        ListView_SetColumnWidth(m_hwndSubjectList, 1, ScaleX(250));  // 开始时间列
+        ListView_SetColumnWidth(m_hwndSubjectList, 2, ScaleX(250));  // 结束时间列
+    }
+    
+    // 重新设置指令列表的列宽（使用DPI缩放）
+    if (m_hwndInstructionList) {
+        ListView_SetColumnWidth(m_hwndInstructionList, 0, ScaleX(120));  // 科目列
+        ListView_SetColumnWidth(m_hwndInstructionList, 1, ScaleX(260));  // 指令列
+        ListView_SetColumnWidth(m_hwndInstructionList, 2, ScaleX(240));  // 播放时间列
+        ListView_SetColumnWidth(m_hwndInstructionList, 3, ScaleX(100));  // 状态列
+    }
     
     // 更新状态栏
     SendMessage(m_hwndStatusBar, WM_SIZE, 0, 0);
