@@ -81,7 +81,7 @@ packages/
 # Audio files (if not essential to the project)
 # Uncomment the following lines if audio files should not be tracked
 *.wav
-# *.mp3
+*.mp3
 # *.ogg
 # *.flac
 

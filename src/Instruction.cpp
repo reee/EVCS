@@ -36,18 +36,39 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
     std::vector<Instruction> instructions;
     
     if (!subject.isDoubleSession) {
-        // 常规考试指令
-        static const InstructionTemplate templates[] = {
-            {-12, L"考前12分钟", "1kq12.wav"},
-            {-10, L"考前10分钟", "2kq10.wav"},
-            {-5,  L"考前5分钟", "3kq5.wav"},
-            {0,   L"开始考试", "4ksks.wav"},
-            {subject.durationMinutes - 15, L"结束前15分钟", "5jsq15.wav"},
-            {subject.durationMinutes, L"考试结束", "6ksjs.wav"}
-        };
+        // 检查是否为英语科目
+        bool isEnglish = (subject.name == "英语");
         
-        for (const auto& temp : templates) {
-            AddInstruction(instructions, subject, temp);
+        if (isEnglish) {
+            // 英语科目的特殊指令序列
+            static const InstructionTemplate englishTemplates[] = {
+                {-12, L"考前12分钟", "1kq12.wav"},
+                {-10, L"考前10分钟", "2kq10.wav"},
+                {-9,  L"听力试音", "sy.mp3"},
+                {-5,  L"考前5分钟", "3kq5.wav"},
+                {0,   L"开始考试", "4ksks.wav"},
+                {1,   L"听力", "tl.mp3"},
+                {subject.durationMinutes - 15, L"结束前15分钟", "5jsq15.wav"},
+                {subject.durationMinutes, L"考试结束", "6ksjs.wav"}
+            };
+            
+            for (const auto& temp : englishTemplates) {
+                AddInstruction(instructions, subject, temp);
+            }
+        } else {
+            // 常规考试指令
+            static const InstructionTemplate templates[] = {
+                {-12, L"考前12分钟", "1kq12.wav"},
+                {-10, L"考前10分钟", "2kq10.wav"},
+                {-5,  L"考前5分钟", "3kq5.wav"},
+                {0,   L"开始考试", "4ksks.wav"},
+                {subject.durationMinutes - 15, L"结束前15分钟", "5jsq15.wav"},
+                {subject.durationMinutes, L"考试结束", "6ksjs.wav"}
+            };
+            
+            for (const auto& temp : templates) {
+                AddInstruction(instructions, subject, temp);
+            }
         }
     } else {
         // 合堂考试指令
