@@ -30,7 +30,6 @@ MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL),
 }
 
 MainWindow::~MainWindow() {
-    DestroyFontAndBrushes();
     CoUninitialize();
 }
 
@@ -57,12 +56,8 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             case WM_DESTROY:
                 KillTimer(hwnd, TIMER_ID);
                 PostQuitMessage(0);
-                return 0;
-                  case WM_DPICHANGED: {
+                return 0;            case WM_DPICHANGED: {
                 pThis->UpdateDpiInfo();
-                
-                // 重新创建字体以适应新的DPI
-                pThis->CreateFontAndBrushes();
                 
                 // 获取新的窗口位置和大小
                 RECT* const prcNewWindow = (RECT*)lParam;
@@ -73,14 +68,8 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                     prcNewWindow->right - prcNewWindow->left,
                     prcNewWindow->bottom - prcNewWindow->top,
                     SWP_NOZORDER | SWP_NOACTIVATE);
-                
-                // 更新布局
+                  // 更新布局
                 pThis->UpdateLayoutForDpi();
-                  // 重新应用字体到所有控件
-                pThis->ApplyDefaultFontToButton(GetDlgItem(hwnd, IDC_ADD_SUBJECT_BTN));  // 按钮使用默认字体
-                pThis->ApplyFontToControl(pThis->m_hwndSubjectList);
-                pThis->ApplyFontToControl(pThis->m_hwndInstructionList);
-                pThis->ApplyFontToControl(pThis->m_hwndStatusBar);
                 
                 return 0;
             }            case WM_SIZE: {
@@ -162,11 +151,9 @@ bool MainWindow::Create() {
         GetModuleHandle(NULL),         // 实例句柄
         this                           // 额外参数
     );
-    
-    // 窗口创建后，初始化字体和画刷（依赖DPI信息）
+      // 窗口创建后，初始化DPI信息
     if (m_hwnd) {
         UpdateDpiInfo();
-        CreateFontAndBrushes();
     }
     
     return (m_hwnd != NULL);
@@ -190,8 +177,9 @@ void MainWindow::CreateControls() {
         GetModuleHandle(NULL),  // 实例句柄
         NULL              // 额外参数
     );
-      // 创建"添加科目"按钮 - 使用DPI缩放
-    CreateWindowExW(
+
+    // 创建"添加科目"按钮 - 使用DPI缩放
+    HWND hAddButton = CreateWindowExW(
         0,
         L"BUTTON",
         L"添加科目",
@@ -201,7 +189,17 @@ void MainWindow::CreateControls() {
         (HMENU)IDC_ADD_SUBJECT_BTN,
         GetModuleHandle(NULL),
         NULL
-    );    // 创建科目列表 - 使用DPI缩放，添加边框
+    );
+    
+    // 为按钮设置合适的字体
+    if (hAddButton) {
+        HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+        if (hFont) {
+            SendMessage(hAddButton, WM_SETFONT, (WPARAM)hFont, TRUE);
+        }
+    }
+
+    // 创建科目列表 - 使用DPI缩放，添加边框
     m_hwndSubjectList = CreateWindowExW(
         WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
         WC_LISTVIEWW,       // 类名
@@ -263,15 +261,8 @@ void MainWindow::CreateControls() {
     lvc.cx = ScaleX(240);  // 播放时间列加宽到240px (原100px)
     ListView_InsertColumn(m_hwndInstructionList, 2, &lvc);
       lvc.iSubItem = 3;
-    lvc.pszText = (LPWSTR)L"状态";
-    lvc.cx = ScaleX(100);  // 状态列加宽到100px (原80px)
+    lvc.pszText = (LPWSTR)L"状态";    lvc.cx = ScaleX(100);  // 状态列加宽到100px (原80px)
     ListView_InsertColumn(m_hwndInstructionList, 3, &lvc);
-    
-      // 应用字体到所有控件
-    ApplyDefaultFontToButton(GetDlgItem(m_hwnd, IDC_ADD_SUBJECT_BTN));  // 按钮使用默认字体
-    ApplyFontToControl(m_hwndSubjectList);
-    ApplyFontToControl(m_hwndInstructionList);
-    ApplyFontToControl(m_hwndStatusBar);
 }
 
 void MainWindow::AddSubject() {
@@ -314,6 +305,22 @@ void MainWindow::DeleteSubject(int index) {
     UpdateInstructionList();
 }
 
+// 辅助函数：UTF-8字符串转换为宽字符串
+std::wstring MainWindow::ConvertUtf8ToWide(const std::string& utf8Str) {
+    if (utf8Str.empty()) {
+        return std::wstring();
+    }
+    
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, NULL, 0);
+    if (size_needed <= 0) {
+        return std::wstring();
+    }
+    
+    std::wstring result(size_needed - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, &result[0], size_needed);
+    return result;
+}
+
 void MainWindow::UpdateStatusBar() {
     int volume = AudioPlayer::getSystemVolume();
     wchar_t statusText[256];
@@ -322,125 +329,114 @@ void MainWindow::UpdateStatusBar() {
 }
 
 void MainWindow::UpdateSubjectList() {
+    // 清空现有项目
     ListView_DeleteAllItems(m_hwndSubjectList);
+    
+    // 如果没有科目，直接返回
+    if (m_subjects.empty()) {
+        return;
+    }
+    
+    // 预分配ListView项目数量以提升性能
+    ListView_SetItemCount(m_hwndSubjectList, static_cast<int>(m_subjects.size()));
     
     for (size_t i = 0; i < m_subjects.size(); ++i) {
         const auto& subject = m_subjects[i];
         
-        // 使用更安全的字符串转换方法
-        std::wstring subjectName;
-        std::wstring startTime;
-        std::wstring endTime;
-        
-        // 转换科目名称
-        if (!subject.name.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, subject.name.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                subjectName.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, subject.name.c_str(), -1, &subjectName[0], size_needed);
+        try {
+            // 转换字符串
+            std::wstring subjectName = ConvertUtf8ToWide(subject.name);
+            std::wstring startTime = ConvertUtf8ToWide(subject.getStartDateTimeString());
+            std::wstring endTime = ConvertUtf8ToWide(subject.getEndDateTimeString());
+            
+            // 创建ListView项目
+            LVITEM lvi = {0};
+            lvi.mask = LVIF_TEXT;
+            lvi.iItem = static_cast<int>(i);
+            lvi.iSubItem = 0;
+            lvi.pszText = const_cast<LPWSTR>(subjectName.c_str());
+            
+            // 插入主项目
+            int itemIndex = ListView_InsertItem(m_hwndSubjectList, &lvi);
+            if (itemIndex != -1) {
+                // 设置子项目文本
+                ListView_SetItemText(m_hwndSubjectList, itemIndex, 1, 
+                                   const_cast<LPWSTR>(startTime.c_str()));
+                ListView_SetItemText(m_hwndSubjectList, itemIndex, 2, 
+                                   const_cast<LPWSTR>(endTime.c_str()));
             }
         }
-          // 转换开始时间 - 使用完整的日期时间
-        std::string startTimeStr = subject.getStartDateTimeString();
-        if (!startTimeStr.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, startTimeStr.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                startTime.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, startTimeStr.c_str(), -1, &startTime[0], size_needed);
-            }
+        catch (const std::exception& e) {
+            // 记录错误但继续处理其他项目
+            OutputDebugStringA("UpdateSubjectList error: ");
+            OutputDebugStringA(e.what());
+            OutputDebugStringA("\n");
+            continue;
         }
-        
-        // 转换结束时间 - 使用完整的日期时间
-        std::string endTimeStr = subject.getEndDateTimeString();
-        if (!endTimeStr.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, endTimeStr.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                endTime.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, endTimeStr.c_str(), -1, &endTime[0], size_needed);
-            }
+        catch (...) {
+            // 处理其他异常
+            OutputDebugStringA("UpdateSubjectList unknown error\n");
+            continue;
         }
-        
-        LVITEM lvi = {0};
-        lvi.mask = LVIF_TEXT;
-        lvi.iItem = static_cast<int>(i);
-        
-        // 添加科目名称
-        lvi.iSubItem = 0;
-        lvi.pszText = const_cast<LPWSTR>(subjectName.c_str());
-        ListView_InsertItem(m_hwndSubjectList, &lvi);        // 添加开始时间 - 使用SetItemText确保安全
-        ListView_SetItemText(m_hwndSubjectList, static_cast<int>(i), 1, const_cast<LPWSTR>(startTime.c_str()));
-        
-        // 添加结束时间
-        ListView_SetItemText(m_hwndSubjectList, static_cast<int>(i), 2, const_cast<LPWSTR>(endTime.c_str()));
     }
 }
 
 void MainWindow::UpdateInstructionList() {
+    // 清空现有项目
     ListView_DeleteAllItems(m_hwndInstructionList);
     
     // 重置下一指令索引，因为列表已更新
     m_nextInstructionIndex = -1;
     
+    // 如果没有指令，直接返回
+    if (m_instructions.empty()) {
+        return;
+    }
+    
+    // 预分配ListView项目数量以提升性能
+    ListView_SetItemCount(m_hwndInstructionList, static_cast<int>(m_instructions.size()));
+    
     for (size_t i = 0; i < m_instructions.size(); ++i) {
         const auto& instruction = m_instructions[i];
         
-        // 使用更安全的字符串转换方法
-        std::wstring subjectName;
-        std::wstring instrName;
-        std::wstring playTime;
-        
-        // 转换科目名称
-        if (!instruction.subjectName.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, instruction.subjectName.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                subjectName.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, instruction.subjectName.c_str(), -1, &subjectName[0], size_needed);
+        try {
+            // 转换字符串
+            std::wstring subjectName = ConvertUtf8ToWide(instruction.subjectName);
+            std::wstring instrName = ConvertUtf8ToWide(instruction.name);
+            std::wstring playTime = ConvertUtf8ToWide(instruction.getPlayDateTimeString());
+            std::wstring status = ConvertUtf8ToWide(instruction.getStatusString());
+            
+            // 创建ListView项目
+            LVITEM lvi = {0};
+            lvi.mask = LVIF_TEXT;
+            lvi.iItem = static_cast<int>(i);
+            lvi.iSubItem = 0;
+            lvi.pszText = const_cast<LPWSTR>(subjectName.c_str());
+            
+            // 插入主项目
+            int itemIndex = ListView_InsertItem(m_hwndInstructionList, &lvi);
+            if (itemIndex != -1) {
+                // 设置子项目文本
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 1, 
+                                   const_cast<LPWSTR>(instrName.c_str()));
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 2, 
+                                   const_cast<LPWSTR>(playTime.c_str()));
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 3, 
+                                   const_cast<LPWSTR>(status.c_str()));
             }
         }
-        
-        // 转换指令名称
-        if (!instruction.name.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, instruction.name.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                instrName.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, instruction.name.c_str(), -1, &instrName[0], size_needed);
-            }
+        catch (const std::exception& e) {
+            // 记录错误但继续处理其他项目
+            OutputDebugStringA("UpdateInstructionList error: ");
+            OutputDebugStringA(e.what());
+            OutputDebugStringA("\n");
+            continue;
         }
-          // 转换播放时间 - 使用完整的日期时间
-        std::string playTimeStr = instruction.getPlayDateTimeString();
-        if (!playTimeStr.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, playTimeStr.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                playTime.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, playTimeStr.c_str(), -1, &playTime[0], size_needed);
-            }
+        catch (...) {
+            // 处理其他异常
+            OutputDebugStringA("UpdateInstructionList unknown error\n");
+            continue;
         }
-        
-        LVITEM lvi = {0};
-        lvi.mask = LVIF_TEXT;
-        lvi.iItem = static_cast<int>(i);
-        
-        // 添加科目名称
-        lvi.iSubItem = 0;
-        lvi.pszText = const_cast<LPWSTR>(subjectName.c_str());
-        ListView_InsertItem(m_hwndInstructionList, &lvi);
-          // 添加指令名称 - 使用SetItemText确保安全
-        ListView_SetItemText(m_hwndInstructionList, static_cast<int>(i), 1, const_cast<LPWSTR>(instrName.c_str()));
-        
-        // 添加播放时间
-        ListView_SetItemText(m_hwndInstructionList, static_cast<int>(i), 2, const_cast<LPWSTR>(playTime.c_str()));
-        
-        // 添加状态
-        std::string statusStr = instruction.getStatusString();
-        std::wstring statusWStr;
-        if (!statusStr.empty()) {
-            int size_needed = MultiByteToWideChar(CP_UTF8, 0, statusStr.c_str(), -1, NULL, 0);
-            if (size_needed > 0) {
-                statusWStr.resize(size_needed - 1);
-                MultiByteToWideChar(CP_UTF8, 0, statusStr.c_str(), -1, &statusWStr[0], size_needed);
-            }
-        }
-        ListView_SetItemText(m_hwndInstructionList, static_cast<int>(i), 3, const_cast<LPWSTR>(statusWStr.c_str()));
     }
 }
 
@@ -602,8 +598,7 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
     static const wchar_t* subjects[] = {
         L"语文", L"数学", L"英语", L"单科", L"首选科目", L"再选合堂"
     };
-    
-    MainWindow* pMainWindow = nullptr;
+      MainWindow* pMainWindow = nullptr;
     if (msg == WM_INITDIALOG) {
         pMainWindow = reinterpret_cast<MainWindow*>(lParam);
         if (!pMainWindow) {
@@ -612,8 +607,7 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
         }
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pMainWindow));
         
-        // 为对话框启用DPI感知
-        SetDialogDpiChangeBehavior(hwnd, DDC_DISABLE_ALL, DDC_DISABLE_ALL);
+        // Windows 7兼容：移除SetDialogDpiChangeBehavior调用
         
     } else {
         pMainWindow = reinterpret_cast<MainWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
@@ -628,20 +622,7 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
             HWND hComboBox = GetDlgItem(hwnd, IDC_SUBJECT_COMBO);
             for (const auto& subject : subjects) {
                 SendMessageW(hComboBox, CB_ADDSTRING, 0, (LPARAM)subject);
-            }
-            SendMessageW(hComboBox, CB_SETCURSEL, 0, 0);            // 应用系统默认字体到对话框控件
-            if (pMainWindow) {
-                pMainWindow->ApplyFontToControl(hwnd);  // 对话框本身
-                pMainWindow->ApplyFontToControl(hComboBox);  // 下拉列表
-                pMainWindow->ApplyFontToControl(GetDlgItem(hwnd, IDC_START_DATE_EDIT));  // 日期编辑框
-                pMainWindow->ApplyFontToControl(GetDlgItem(hwnd, IDC_START_TIME_EDIT));  // 时间编辑框
-                pMainWindow->ApplyDefaultFontToButton(GetDlgItem(hwnd, IDOK));  // 确定按钮使用默认字体
-                pMainWindow->ApplyDefaultFontToButton(GetDlgItem(hwnd, IDCANCEL));  // 取消按钮使用默认字体
-                
-                // 应用到静态标签
-                HWND hStatic1 = GetDlgItem(hwnd, IDC_STATIC);
-                if (hStatic1) pMainWindow->ApplyFontToControl(hStatic1);
-            }
+            }            SendMessageW(hComboBox, CB_SETCURSEL, 0, 0);
               // 设置默认日期为今天
             SYSTEMTIME st;
             GetLocalTime(&st);
@@ -768,7 +749,14 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
 
 // DPI相关函数实现
 void MainWindow::UpdateDpiInfo() {
-    m_dpi = GetDpiForWindow(m_hwnd);
+    // 使用GetDeviceCaps替代GetDpiForWindow以兼容Windows 7
+    HDC hdc = GetDC(m_hwnd);
+    if (hdc) {
+        m_dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+        ReleaseDC(m_hwnd, hdc);
+    } else {
+        m_dpi = 96; // 默认DPI
+    }
     m_dpiScaleX = m_dpi / 96.0f;
     m_dpiScaleY = m_dpi / 96.0f;
 }
@@ -809,36 +797,6 @@ void MainWindow::UpdateLayoutForDpi() {
     
     // 更新状态栏
     SendMessage(m_hwndStatusBar, WM_SIZE, 0, 0);
-}
-
-// 字体管理函数
-void MainWindow::CreateFontAndBrushes() {
-    // 使用系统默认字体，不需要创建自定义字体
-    // 保留此函数为了兼容性，但不执行任何操作
-}
-
-void MainWindow::DestroyFontAndBrushes() {
-    // 使用系统默认字体，不需要销毁任何自定义字体
-}
-
-void MainWindow::ApplyFontToControl(HWND hwnd) {
-    if (hwnd) {
-        // 使用系统默认GUI字体
-        HFONT hDefaultFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-        if (hDefaultFont) {
-            SendMessage(hwnd, WM_SETFONT, (WPARAM)hDefaultFont, TRUE);
-        }
-    }
-}
-
-void MainWindow::ApplyDefaultFontToButton(HWND hwnd) {
-    if (hwnd) {
-        // 获取系统默认GUI字体
-        HFONT hDefaultFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-        if (hDefaultFont) {
-            SendMessage(hwnd, WM_SETFONT, (WPARAM)hDefaultFont, TRUE);
-        }
-    }
 }
 
 // 指令播放相关方法实现

@@ -1,11 +1,9 @@
 #include "MainWindow.h"
-#include <shellscalingapi.h>
-
-#pragma comment(lib, "shcore.lib")
 
 int WINAPI wWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PWSTR /*pCmdLine*/, int nCmdShow) {
-    // 设置DPI感知模式 - 支持每显示器DPI感知
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    // 设置DPI感知模式 - 兼容Windows 7
+    // 使用SetProcessDPIAware替代SetProcessDpiAwarenessContext
+    SetProcessDPIAware();
     
     MainWindow mainWindow;
     

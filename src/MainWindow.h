@@ -48,12 +48,10 @@ private:
       // DPI相关函数
     void UpdateDpiInfo();
     int ScaleX(int x) const;
-    int ScaleY(int y) const;
-    void UpdateLayoutForDpi();    // 字体函数（使用系统默认字体）
-    void CreateFontAndBrushes();  // 保留以兼容DPI变化处理
-    void DestroyFontAndBrushes(); // 保留以兼容现有代码
-    void ApplyFontToControl(HWND hwnd);  // 应用系统默认字体
-    void ApplyDefaultFontToButton(HWND hwnd);  // 为按钮应用默认系统字体
+    int ScaleY(int y) const;    void UpdateLayoutForDpi();
+    
+    // 辅助函数
+    std::wstring ConvertUtf8ToWide(const std::string& utf8Str);
     
     static constexpr int TIMER_ID = 1;
     static constexpr int TIMER_INTERVAL = 1000;  // 1秒
