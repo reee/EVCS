@@ -188,11 +188,15 @@ void MainWindow::CreateControls() {
         NULL,             // 菜单
         GetModuleHandle(NULL),  // 实例句柄
         NULL              // 额外参数
-    );    // 设置状态栏的分区 - 创建3个分区：系统音量，当前时间，下一指令倒计时
+    );    // 设置状态栏的分区 - 创建4个分区：系统音量，音频文件状态，当前时间，下一指令倒计时
     if (m_hwndStatusBar) {
         // 使用DPI缩放的状态栏分区宽度
-        int statusWidths[] = { ScaleX(120), ScaleX(350), -1 }; // -1表示最后一个分区占用剩余空间
-        SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
+        // Part 0: Volume, Width: ScaleX(120) -> Right edge: ScaleX(120)
+        // Part 1: Audio File Status, Width: ScaleX(250) -> Right edge: ScaleX(120 + 250) = ScaleX(370)
+        // Part 2: Current Time, Width: ScaleX(200) -> Right edge: ScaleX(120 + 250 + 200) = ScaleX(570)
+        // Part 3: Next Instruction, Width: -1 (remaining)
+        int statusWidths[] = { ScaleX(120), ScaleX(370), ScaleX(570), -1 };
+        SendMessage(m_hwndStatusBar, SB_SETPARTS, 4, (LPARAM)statusWidths);
     }
 
     // 创建"添加科目"按钮 - 使用DPI缩放
@@ -383,11 +387,31 @@ void MainWindow::UpdateStatusBar() {
     int volume = AudioPlayer::getSystemVolume();
     wchar_t volumeText[64];
     swprintf_s(volumeText, _countof(volumeText), L"音量: %d%%", volume);
+
+    // 检查所有指令的音频文件状态
+    wchar_t audioFileStatusText[256] = L"音频文件: 无指令";
+    int missingFileCount = 0;
+    if (!m_instructions.empty()) {
+        for (const auto& instruction : m_instructions) {
+            if (!instruction.checkAudioFileExists()) {
+                missingFileCount++;
+            }
+        }
+        if (missingFileCount == 0) {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 全部存在");
+        } else {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: %d 个缺失", missingFileCount);
+        }
+    } else {
+        // 如果没有指令，也更新状态栏文本
+         swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令");
+    }
     
     // 设置状态栏的各个分区文本
     SendMessage(m_hwndStatusBar, SB_SETTEXT, 0, (LPARAM)volumeText);           // 分区0: 系统音量
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 1, (LPARAM)currentTimeText);      // 分区1: 当前时间
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 2, (LPARAM)nextInstructionText);  // 分区2: 下一指令倒计时
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 1, (LPARAM)audioFileStatusText); // 分区1: 音频文件状态
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 2, (LPARAM)currentTimeText);      // 分区2: 当前时间
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 3, (LPARAM)nextInstructionText);  // 分区3: 下一指令倒计时
 }
 
 void MainWindow::UpdateSubjectList() {
@@ -865,8 +889,12 @@ void MainWindow::UpdateLayoutForDpi() {
     GetWindowRect(m_hwndStatusBar, &rcStatus);
     int statusHeight = rcStatus.bottom - rcStatus.top;      // 重新设置状态栏分区宽度（使用DPI缩放）
     if (m_hwndStatusBar) {
-        int statusWidths[] = { ScaleX(120), ScaleX(350), -1 };
-        SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
+        // Part 0: Volume, Width: ScaleX(120) -> Right edge: ScaleX(120)
+        // Part 1: Audio File Status, Width: ScaleX(250) -> Right edge: ScaleX(120 + 250) = ScaleX(370)
+        // Part 2: Current Time, Width: ScaleX(200) -> Right edge: ScaleX(120 + 250 + 200) = ScaleX(570)
+        // Part 3: Next Instruction, Width: -1 (remaining)
+        int statusWidths[] = { ScaleX(120), ScaleX(370), ScaleX(570), -1 };
+        SendMessage(m_hwndStatusBar, SB_SETPARTS, 4, (LPARAM)statusWidths);
     }
     
     // 使用DPI缩放的尺寸重新布局控件

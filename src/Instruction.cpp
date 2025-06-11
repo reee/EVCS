@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <windows.h>
+#include <filesystem> // 添加此行
 
 namespace {
     struct InstructionTemplate {
@@ -97,6 +98,16 @@ std::string Instruction::getPlayDateTimeString() const {
 bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_clock::now();
     auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - playTime).count();
     return diff >= 0 && diff < 60;  // 在当前分钟内
+}
+
+// 新增方法：检查音频文件是否存在
+bool Instruction::checkAudioFileExists() const {
+    if (!audioFileStatusChecked) {
+        std::string filePath = "audio/" + audioFile; // 在文件名前加上 "audio/" 路径
+        audioFileExists = std::filesystem::exists(filePath);
+        audioFileStatusChecked = true;
+    }
+    return audioFileExists;
 }
 
 COLORREF Instruction::getStatusTextColor() const {
