@@ -1,0 +1,37 @@
+<svg width="256" height="256" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">
+  <!-- 
+    这是SVG图标的代码。
+    - viewBox="0 0 128 128": 定义了SVG的内部坐标系。
+    - width="256" height="256": 设置了图标的默认显示大小。
+  -->
+  
+  <!-- 定义渐变色 -->
+  <defs>
+    <linearGradient id="iconGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4F46E5" /> <!-- 起始颜色 (靛蓝色) -->
+      <stop offset="100%" stop-color="#22D3EE" /> <!-- 结束颜色 (青色) -->
+    </linearGradient>
+  </defs>
+
+  <!-- 背景：带圆角的矩形，并应用渐变色 -->
+  <rect 
+    width="128" 
+    height="128" 
+    rx="28" 
+    ry="28" 
+    fill="url(#iconGradient)" 
+  />
+
+  <!-- 文字："指令" -->
+  <text 
+    x="50%" 
+    y="50%" 
+    font-size="40"
+    font-weight="bold"  
+    fill="white" 
+    text-anchor="middle" 
+    dominant-baseline="central"
+  >
+    EVCS
+  </text>
+</svg>
