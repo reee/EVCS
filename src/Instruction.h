@@ -26,7 +26,6 @@ struct Instruction {
 
     // 构造函数，默认状态为未播放
     Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED), audioFileExists(false), audioFileStatusChecked(false) {}    static std::vector<Instruction> generateInstructions(const Subject& subject);
-    std::string getPlayTimeString() const;
     std::string getPlayDateTimeString() const;
     bool shouldPlayNow() const;
     bool checkAudioFileExists() const; // 检查音频文件是否存在的方法

@@ -5,6 +5,7 @@
 #include <CommCtrl.h>
 #include <string>
 #include <chrono>
+#include <algorithm>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -80,11 +81,11 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
             }            case WM_SIZE: {
                 pThis->UpdateLayoutForDpi();
                 return 0;
-            }
-                  case WM_TIMER:
+            }            case WM_TIMER:
                 if (wParam == TIMER_ID) {
                     pThis->UpdateStatusBar();
                     pThis->UpdateStatusPanel();  // 更新状态面板
+                    pThis->CheckPlaybackCompletion();  // 检查播放完成状态
                     pThis->UpdateNextInstruction();
                 }
                 return 0;
@@ -403,7 +404,34 @@ void MainWindow::UpdateStatusBar() {
 }
 
 void MainWindow::UpdateStatusPanel() {
-    // 计算下一指令播放倒计时
+    wchar_t statusText[512] = L"";
+    
+    // 第一部分：当前指令信息
+    if (m_currentPlayingIndex >= 0 && 
+        static_cast<size_t>(m_currentPlayingIndex) < m_instructions.size()) {
+        
+        const auto& currentInstruction = m_instructions[m_currentPlayingIndex];
+        
+        if (currentInstruction.status == PlaybackStatus::PLAYING) {
+            // 计算已播放时长和总时长
+            auto now = std::chrono::system_clock::now();
+            auto playedDuration = std::chrono::duration_cast<std::chrono::seconds>(
+                now - m_currentPlayingStartTime).count();
+              // 获取音频文件总时长
+            double totalDuration = AudioPlayer::getAudioDuration(currentInstruction.audioFile);
+            int totalSeconds = static_cast<int>(totalDuration);
+            int remainingSeconds = (totalSeconds - static_cast<int>(playedDuration)) > 0 ? 
+                                 (totalSeconds - static_cast<int>(playedDuration)) : 0;
+            
+            swprintf_s(statusText, _countof(statusText), 
+                L"当前指令: %s (剩余 %d秒 / 总计 %d秒) | ", 
+                ConvertUtf8ToWide(currentInstruction.name).c_str(),
+                remainingSeconds,
+                totalSeconds);
+        }
+    }
+    
+    // 第二部分：下一指令信息
     wchar_t nextInstructionText[256] = L"下一指令: 无";
     if (m_nextInstructionIndex >= 0 && 
         static_cast<size_t>(m_nextInstructionIndex) < m_instructions.size()) {
@@ -437,9 +465,12 @@ void MainWindow::UpdateStatusPanel() {
         }
     }
     
+    // 合并当前指令和下一指令信息
+    wcscat_s(statusText, _countof(statusText), nextInstructionText);
+    
     // 更新状态面板文本
     if (m_hwndStatusPanel) {
-        SetWindowTextW(m_hwndStatusPanel, nextInstructionText);
+        SetWindowTextW(m_hwndStatusPanel, statusText);
     }
 }
 
@@ -1093,26 +1124,27 @@ void MainWindow::PlayInstruction(int index, bool isManualPlay) {
         static_cast<size_t>(m_currentPlayingIndex) < m_instructions.size()) {
         m_instructions[m_currentPlayingIndex].status = PlaybackStatus::PLAYED;
     }
+      instruction.status = PlaybackStatus::PLAYING;
+    m_currentPlayingIndex = index;
     
-    instruction.status = PlaybackStatus::PLAYING;
-    m_currentPlayingIndex = index;    // 播放音频文件
+    // 记录播放开始时间
+    m_currentPlayingStartTime = std::chrono::system_clock::now();
+    
+    // 播放音频文件
     AudioPlayer::playAudioFile(instruction.audioFile);
-      // 更新显示
+    
+    // 更新显示
     UpdateInstructionListDisplay();
     
-    // 简化处理：立即标记为已播放并设置下一指令
-    instruction.status = PlaybackStatus::PLAYED;
-    m_currentPlayingIndex = -1;
-    
-    // 设置下一指令
+    // 注意：不再立即标记为已播放，等待CheckPlaybackCompletion检查播放完成
+    // 设置下一指令（如果需要）
     if (isManualPlay) {
         // 手动播放：设置为被播放指令之后的第一个未播放指令
         m_nextInstructionIndex = FindNextUnplayedInstructionAfter(index);
     } else {
-        // 自动播放：设置为列表中第一个未播放指令
-        SetNextInstruction();
+        // 自动播放：保持当前的下一指令设置
+        // 下一指令的设置会在播放完成后自动处理
     }
-      UpdateInstructionListDisplay();
 }
 
 void MainWindow::MarkPreviousAsSkipped(int playIndex) {
@@ -1224,5 +1256,48 @@ void MainWindow::ShowInstructionContextMenu(int x, int y, int itemIndex) {
         
         // 销毁菜单
         DestroyMenu(hMenu);
+    }
+}
+
+void MainWindow::CheckPlaybackCompletion() {
+    // 检查是否有指令正在播放
+    if (m_currentPlayingIndex < 0 || 
+        static_cast<size_t>(m_currentPlayingIndex) >= m_instructions.size()) {
+        return;  // 没有指令正在播放
+    }
+    
+    auto& currentInstruction = m_instructions[m_currentPlayingIndex];
+    
+    // 确认指令状态为播放中
+    if (currentInstruction.status != PlaybackStatus::PLAYING) {
+        return;  // 指令不是播放中状态
+    }
+    
+    // 获取音频文件总时长
+    double totalDuration = AudioPlayer::getAudioDuration(currentInstruction.audioFile);
+    if (totalDuration <= 0.0) {
+        // 无法获取音频时长，假设播放完成
+        currentInstruction.status = PlaybackStatus::PLAYED;
+        m_currentPlayingIndex = -1;
+        
+        // 设置下一指令
+        SetNextInstruction();
+        UpdateInstructionListDisplay();
+        return;
+    }
+    
+    // 计算已播放时长
+    auto now = std::chrono::system_clock::now();
+    auto playedDuration = std::chrono::duration_cast<std::chrono::seconds>(
+        now - m_currentPlayingStartTime).count();
+    
+    // 如果已播放时长超过总时长，认为播放完成
+    if (playedDuration >= static_cast<int>(totalDuration)) {
+        currentInstruction.status = PlaybackStatus::PLAYED;
+        m_currentPlayingIndex = -1;
+        
+        // 设置下一指令
+        SetNextInstruction();
+        UpdateInstructionListDisplay();
     }
 }

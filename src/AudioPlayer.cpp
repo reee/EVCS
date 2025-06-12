@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <windows.h>
+#include <mmsystem.h>
 
 // 包含Bass Audio Library
 #include "../third_party/bass/bass.h"
@@ -51,17 +52,8 @@ void AudioPlayer::playAudioFile(const std::string& filename) {
         return;
     }
     
-    // 检查文件扩展名
-    std::string extension = audioPath.extension().string();
-    for (auto& c : extension) {
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    }
-    
-    if (extension == ".mp3") {
-        playMP3WithBass(audioPath.string());
-    } else {
-        playWAVWithPlaySound(audioPath.string());
-    }
+    // 统一使用BASS播放所有音频文件
+    playWithBass(audioPath.string());
 }
 
 int AudioPlayer::getSystemVolume() {
@@ -117,7 +109,7 @@ int AudioPlayer::getSystemVolume() {
     return static_cast<int>(currentVolume * 100);
 }
 
-bool AudioPlayer::playMP3WithBass(const std::string& filePath) {
+bool AudioPlayer::playWithBass(const std::string& filePath) {
     // 将路径转换为宽字符串以支持Unicode文件名
     std::wstring wideFilePath;
     int size_needed = MultiByteToWideChar(CP_UTF8, 0, filePath.c_str(), -1, NULL, 0);
@@ -126,7 +118,7 @@ bool AudioPlayer::playMP3WithBass(const std::string& filePath) {
         MultiByteToWideChar(CP_UTF8, 0, filePath.c_str(), -1, &wideFilePath[0], size_needed);
     }
     
-    // 创建音频流
+    // 创建音频流（支持WAV、MP3等多种格式）
     HSTREAM stream = BASS_StreamCreateFile(FALSE, wideFilePath.c_str(), 0, 0, 
                                          BASS_STREAM_AUTOFREE | BASS_UNICODE);
     
@@ -144,6 +136,37 @@ bool AudioPlayer::playMP3WithBass(const std::string& filePath) {
     return false;
 }
 
-bool AudioPlayer::playWAVWithPlaySound(const std::string& filePath) {
-    return PlaySoundA(filePath.c_str(), NULL, SND_FILENAME | SND_ASYNC) != FALSE;
+double AudioPlayer::getAudioDuration(const std::string& filename) {
+    if (!s_initialized) {
+        initialize();
+    }
+    
+    std::filesystem::path audioPath = std::filesystem::current_path() / "audio" / filename;
+    if (!std::filesystem::exists(audioPath)) {
+        return 0.0;
+    }
+    
+    // 将路径转换为宽字符串
+    std::wstring wideFilePath;
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, audioPath.string().c_str(), -1, NULL, 0);
+    if (size_needed > 0) {
+        wideFilePath.resize(size_needed - 1);
+        MultiByteToWideChar(CP_UTF8, 0, audioPath.string().c_str(), -1, &wideFilePath[0], size_needed);
+    }
+    
+    // 创建音频流但不播放
+    HSTREAM stream = BASS_StreamCreateFile(FALSE, wideFilePath.c_str(), 0, 0, BASS_UNICODE);
+    if (stream) {
+        // 获取音频时长（以字节为单位）
+        QWORD lengthBytes = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
+        if (lengthBytes != (QWORD)-1) {
+            // 转换为秒
+            double lengthSeconds = BASS_ChannelBytes2Seconds(stream, lengthBytes);
+            BASS_StreamFree(stream);
+            return lengthSeconds;
+        }
+        BASS_StreamFree(stream);
+    }
+    
+    return 0.0;  // 获取时长失败
 }

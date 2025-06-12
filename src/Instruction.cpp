@@ -93,16 +93,6 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
     return instructions;
 }
 
-std::string Instruction::getPlayTimeString() const {
-    auto time = std::chrono::system_clock::to_time_t(playTime);
-    std::tm tm = {};
-    localtime_s(&tm, &time);
-    std::stringstream ss;
-    ss << std::setfill('0') << std::setw(2) << tm.tm_hour << ":"
-       << std::setfill('0') << std::setw(2) << tm.tm_min;
-    return ss.str();
-}
-
 std::string Instruction::getPlayDateTimeString() const {
     auto time = std::chrono::system_clock::to_time_t(playTime);
     std::tm tm = {};

@@ -7,10 +7,10 @@ public:
     static bool initialize();
     static void cleanup();
     static void playAudioFile(const std::string& filename);
+    static double getAudioDuration(const std::string& filename);  // 获取音频文件时长（秒）
     static int getSystemVolume();
     
 private:
     static bool s_initialized;
-    static bool playMP3WithBass(const std::string& filePath);
-    static bool playWAVWithPlaySound(const std::string& filePath);
+    static bool playWithBass(const std::string& filePath);  // 统一使用BASS播放
 };
