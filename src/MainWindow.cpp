@@ -4,6 +4,7 @@
 #include <windowsx.h>
 #include <CommCtrl.h>
 #include <string>
+#include <chrono>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -518,6 +519,30 @@ void MainWindow::UpdateNextInstruction() {
         return;  // 当前有指令正在播放，等待播放完成
     }
     
+    // 检查并标记过期超过60秒的指令为跳过
+    auto now = std::chrono::system_clock::now();
+    auto nowTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
+        now.time_since_epoch()).count();
+    
+    bool hasExpiredInstructions = false;
+    for (auto& instruction : m_instructions) {
+        if (instruction.status == PlaybackStatus::UNPLAYED) {
+            auto instructionTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
+                instruction.playTime.time_since_epoch()).count();
+            
+            // 如果指令已过期超过60秒，标记为跳过
+            if (nowTimestamp - instructionTimestamp > 60) {
+                instruction.status = PlaybackStatus::SKIPPED;
+                hasExpiredInstructions = true;
+            }
+        }
+    }
+    
+    // 如果有指令被标记为跳过，更新显示
+    if (hasExpiredInstructions) {
+        UpdateInstructionListDisplay();
+    }
+    
     // 检查下一指令是否有效且仍未播放
     if (m_nextInstructionIndex < 0 || 
         static_cast<size_t>(m_nextInstructionIndex) >= m_instructions.size() ||
@@ -967,6 +992,25 @@ void MainWindow::PlayInstruction(int index, bool isManualPlay) {
     
     auto& instruction = m_instructions[index];
     
+    // 检查指令是否已过期超过60秒（只对自动播放生效）
+    if (!isManualPlay) {
+        auto now = std::chrono::system_clock::now();
+        auto nowTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
+            now.time_since_epoch()).count();
+        auto instructionTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
+            instruction.playTime.time_since_epoch()).count();
+        
+        // 如果指令已过期超过60秒，标记为跳过并返回
+        if (nowTimestamp - instructionTimestamp > 60) {
+            instruction.status = PlaybackStatus::SKIPPED;
+            UpdateInstructionListDisplay();
+            
+            // 设置下一指令
+            SetNextInstruction();
+            return;
+        }
+    }
+    
     // 如果是手动播放，标记之前未播放的指令为跳过
     if (isManualPlay) {
         MarkPreviousAsSkipped(index);
@@ -1066,13 +1110,24 @@ bool MainWindow::IsTimeToPlayNextInstruction() const {
         return false;
     }
     
-    // 检查时间是否已到（精确到分钟）
+    // 获取当前时间和指令播放时间的Unix时间戳
     auto now = std::chrono::system_clock::now();
-    auto nowTime = std::chrono::system_clock::to_time_t(now);
-    auto instrTime = std::chrono::system_clock::to_time_t(instruction.playTime);
+    auto instructionTime = instruction.playTime;
     
-    // 将时间转换为分钟进行比较
-    return (nowTime / 60) >= (instrTime / 60);
+    // 转换为Unix时间戳（秒）
+    auto nowTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
+        now.time_since_epoch()).count();
+    auto instructionTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
+        instructionTime.time_since_epoch()).count();
+    
+    // 检查指令是否已过期超过60秒
+    if (nowTimestamp - instructionTimestamp > 60) {
+        // 指令已过期超过60秒，不播放
+        return false;
+    }
+    
+    // 比较时间戳：当指令时间已到且未过期超过60秒时返回true
+    return instructionTimestamp <= nowTimestamp;
 }
 
 void MainWindow::ShowInstructionContextMenu(int x, int y, int itemIndex) {
