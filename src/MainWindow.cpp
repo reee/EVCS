@@ -17,7 +17,7 @@
 #define WINDOW_TITLE "考试语音指令系统"
 #endif
 
-MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), 
+MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), m_hwndStatusPanel(NULL), m_hStatusPanelFont(NULL),
     m_hwndSubjectList(NULL), m_hwndInstructionList(NULL), m_dpi(96), m_dpiScaleX(1.0f), m_dpiScaleY(1.0f),
     m_currentPlayingIndex(-1), m_nextInstructionIndex(-1) {
     // 初始化COM
@@ -31,6 +31,10 @@ MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL),
 }
 
 MainWindow::~MainWindow() {
+    // 清理字体资源
+    if (m_hStatusPanelFont) {
+        DeleteObject(m_hStatusPanelFont);
+    }
     CoUninitialize();
 }
 
@@ -77,10 +81,10 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 pThis->UpdateLayoutForDpi();
                 return 0;
             }
-                
-            case WM_TIMER:
+                  case WM_TIMER:
                 if (wParam == TIMER_ID) {
                     pThis->UpdateStatusBar();
+                    pThis->UpdateStatusPanel();  // 更新状态面板
                     pThis->UpdateNextInstruction();
                 }
                 return 0;
@@ -196,22 +200,55 @@ void MainWindow::CreateControls() {
         NULL,             // 菜单
         GetModuleHandle(NULL),  // 实例句柄
         NULL              // 额外参数
-    );    // 设置状态栏的分区 - 创建4个分区：系统音量，音频文件状态，当前时间，下一指令倒计时
+    );    // 设置状态栏的分区 - 创建3个分区：系统音量，音频文件状态，当前时间
     if (m_hwndStatusBar) {
         // 使用DPI缩放的状态栏分区宽度
         // Part 0: Volume, Width: ScaleX(120) -> Right edge: ScaleX(120)
         // Part 1: Audio File Status, Width: ScaleX(250) -> Right edge: ScaleX(120 + 250) = ScaleX(370)
-        // Part 2: Current Time, Width: ScaleX(200) -> Right edge: ScaleX(120 + 250 + 200) = ScaleX(570)
-        // Part 3: Next Instruction, Width: -1 (remaining)
-        int statusWidths[] = { ScaleX(120), ScaleX(370), ScaleX(570), -1 };
-        SendMessage(m_hwndStatusBar, SB_SETPARTS, 4, (LPARAM)statusWidths);
-    }    // 创建科目列表 - 使用DPI缩放，添加边框
+        // Part 2: Current Time, Width: -1 (remaining)
+        int statusWidths[] = { ScaleX(120), ScaleX(370), -1 };
+        SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
+    }    // 创建状态面板 - 显示下一指令信息
+    m_hwndStatusPanel = CreateWindowExW(
+        WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
+        L"STATIC",           // 类名
+        L"下一指令: 无",       // 初始文本
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,  // 样式
+        ScaleX(10), ScaleY(10), ScaleX(780), ScaleY(50),   // 位置和大小：高度从30增加到50
+        m_hwnd,              // 父窗口
+        (HMENU)IDC_STATUS_PANEL,  // 控件ID
+        GetModuleHandle(NULL),    // 实例句柄
+        NULL                 // 额外参数
+    );    // 为状态面板设置更大的字体
+    if (m_hwndStatusPanel) {
+        m_hStatusPanelFont = CreateFontW(
+            ScaleY(16),         // 字体高度（使用DPI缩放）
+            0,                  // 字体宽度（0表示自动）
+            0,                  // 文本角度
+            0,                  // 基线角度
+            FW_NORMAL,          // 字体粗细
+            FALSE,              // 是否斜体
+            FALSE,              // 是否下划线
+            FALSE,              // 是否删除线
+            DEFAULT_CHARSET,    // 字符集
+            OUT_DEFAULT_PRECIS, // 输出精度
+            CLIP_DEFAULT_PRECIS,// 裁剪精度
+            DEFAULT_QUALITY,    // 输出质量
+            DEFAULT_PITCH | FF_DONTCARE, // 字体间距和族
+            NULL                // 使用系统默认字体
+        );
+        if (m_hStatusPanelFont) {
+            SendMessage(m_hwndStatusPanel, WM_SETFONT, (WPARAM)m_hStatusPanelFont, TRUE);
+        }
+    }
+
+    // 创建科目列表 - 使用DPI缩放，添加边框
     m_hwndSubjectList = CreateWindowExW(
         WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
         WC_LISTVIEWW,       // 类名
         NULL,               // 窗口文本
         WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SINGLESEL,  // 样式
-        ScaleX(10), ScaleY(10), ScaleX(780), ScaleY(200),   // 位置调整：从Y=50改为Y=10
+        ScaleX(10), ScaleY(70), ScaleX(780), ScaleY(200),   // 位置调整：Y从50改为70，为更高的状态面板留出空间
         m_hwnd,             // 父窗口
         (HMENU)IDC_SUBJECT_LIST,  // 控件ID
         GetModuleHandle(NULL),    // 实例句柄
@@ -305,10 +342,10 @@ void MainWindow::DeleteSubject(int index) {
     
     // 删除科目
     m_subjects.erase(m_subjects.begin() + index);
-    
-    // 更新列表
+      // 更新列表
     UpdateSubjectList();
     UpdateInstructionList();
+    UpdateStatusPanel();  // 更新状态面板
 }
 
 // 辅助函数：UTF-8字符串转换为宽字符串
@@ -335,6 +372,37 @@ void MainWindow::UpdateStatusBar() {
     swprintf_s(currentTimeText, _countof(currentTimeText), 
         L"当前时间: %02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
     
+    // 获取系统音量
+    int volume = AudioPlayer::getSystemVolume();
+    wchar_t volumeText[64];
+    swprintf_s(volumeText, _countof(volumeText), L"音量: %d%%", volume);
+
+    // 检查所有指令的音频文件状态
+    wchar_t audioFileStatusText[256] = L"音频文件: 无指令";
+    int missingFileCount = 0;
+    if (!m_instructions.empty()) {
+        for (const auto& instruction : m_instructions) {
+            if (!instruction.checkAudioFileExists()) {
+                missingFileCount++;
+            }
+        }
+        if (missingFileCount == 0) {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 全部存在");
+        } else {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: %d 个缺失", missingFileCount);
+        }
+    } else {
+        // 如果没有指令，也更新状态栏文本
+         swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令");
+    }
+    
+    // 设置状态栏的各个分区文本
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 0, (LPARAM)volumeText);           // 分区0: 系统音量
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 1, (LPARAM)audioFileStatusText); // 分区1: 音频文件状态
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 2, (LPARAM)currentTimeText);      // 分区2: 当前时间
+}
+
+void MainWindow::UpdateStatusPanel() {
     // 计算下一指令播放倒计时
     wchar_t nextInstructionText[256] = L"下一指令: 无";
     if (m_nextInstructionIndex >= 0 && 
@@ -368,35 +436,11 @@ void MainWindow::UpdateStatusBar() {
             }
         }
     }
-      // 获取系统音量
-    int volume = AudioPlayer::getSystemVolume();
-    wchar_t volumeText[64];
-    swprintf_s(volumeText, _countof(volumeText), L"音量: %d%%", volume);
-
-    // 检查所有指令的音频文件状态
-    wchar_t audioFileStatusText[256] = L"音频文件: 无指令";
-    int missingFileCount = 0;
-    if (!m_instructions.empty()) {
-        for (const auto& instruction : m_instructions) {
-            if (!instruction.checkAudioFileExists()) {
-                missingFileCount++;
-            }
-        }
-        if (missingFileCount == 0) {
-            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 全部存在");
-        } else {
-            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: %d 个缺失", missingFileCount);
-        }
-    } else {
-        // 如果没有指令，也更新状态栏文本
-         swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令");
-    }
     
-    // 设置状态栏的各个分区文本
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 0, (LPARAM)volumeText);           // 分区0: 系统音量
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 1, (LPARAM)audioFileStatusText); // 分区1: 音频文件状态
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 2, (LPARAM)currentTimeText);      // 分区2: 当前时间
-    SendMessage(m_hwndStatusBar, SB_SETTEXT, 3, (LPARAM)nextInstructionText);  // 分区3: 下一指令倒计时
+    // 更新状态面板文本
+    if (m_hwndStatusPanel) {
+        SetWindowTextW(m_hwndStatusPanel, nextInstructionText);
+    }
 }
 
 void MainWindow::UpdateSubjectList() {
@@ -814,13 +858,13 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                         
                         // 生成并更新指令列表
                         auto instructions = Instruction::generateInstructions(subject);
-                        
-                        pMainWindow->m_instructions.insert(
+                          pMainWindow->m_instructions.insert(
                             pMainWindow->m_instructions.end(),
                             instructions.begin(),
                             instructions.end()
                         );
                         pMainWindow->UpdateInstructionList();
+                        pMainWindow->UpdateStatusPanel();  // 更新状态面板
                         
                         EndDialog(hwnd, IDOK);
                         return TRUE;
@@ -943,24 +987,52 @@ void MainWindow::UpdateLayoutForDpi() {
     if (m_hwndStatusBar) {
         // Part 0: Volume, Width: ScaleX(120) -> Right edge: ScaleX(120)
         // Part 1: Audio File Status, Width: ScaleX(250) -> Right edge: ScaleX(120 + 250) = ScaleX(370)
-        // Part 2: Current Time, Width: ScaleX(200) -> Right edge: ScaleX(120 + 250 + 200) = ScaleX(570)
-        // Part 3: Next Instruction, Width: -1 (remaining)
-        int statusWidths[] = { ScaleX(120), ScaleX(370), ScaleX(570), -1 };
-        SendMessage(m_hwndStatusBar, SB_SETPARTS, 4, (LPARAM)statusWidths);
+        // Part 2: Current Time, Width: -1 (remaining)
+        int statusWidths[] = { ScaleX(120), ScaleX(370), -1 };
+        SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
+    }    // 更新状态面板位置和大小
+    if (m_hwndStatusPanel) {
+        MoveWindow(m_hwndStatusPanel,
+            ScaleX(10), ScaleY(10),
+            rcClient.right - ScaleX(20),
+            ScaleY(50),  // 高度从30增加到50
+            TRUE);
+        
+        // 重新创建字体以适应新的DPI
+        if (m_hStatusPanelFont) {
+            DeleteObject(m_hStatusPanelFont);
+        }        m_hStatusPanelFont = CreateFontW(
+            ScaleY(16),         // 字体高度（使用DPI缩放）
+            0,                  // 字体宽度（0表示自动）
+            0,                  // 文本角度
+            0,                  // 基线角度
+            FW_NORMAL,          // 字体粗细
+            FALSE,              // 是否斜体
+            FALSE,              // 是否下划线
+            FALSE,              // 是否删除线
+            DEFAULT_CHARSET,    // 字符集
+            OUT_DEFAULT_PRECIS, // 输出精度
+            CLIP_DEFAULT_PRECIS,// 裁剪精度
+            DEFAULT_QUALITY,    // 输出质量
+            DEFAULT_PITCH | FF_DONTCARE, // 字体间距和族
+            NULL                // 使用系统默认字体
+        );
+        if (m_hStatusPanelFont) {
+            SendMessage(m_hwndStatusPanel, WM_SETFONT, (WPARAM)m_hStatusPanelFont, TRUE);
+        }
     }
     
     // 计算可用高度并按比例分配：科目列表占1/3，指令列表占2/3
-    int availableHeight = rcClient.bottom - statusHeight - ScaleY(40);  // 减少边距从80到40
+    int availableHeight = rcClient.bottom - statusHeight - ScaleY(100);  // 为更高的状态面板预留更多空间
     int subjectListHeight = availableHeight / 3;
     int instructionListHeight = availableHeight * 2 / 3 - ScaleY(20);
       MoveWindow(m_hwndSubjectList,
-        ScaleX(10), ScaleY(10),  // 从Y=50改为Y=10
+        ScaleX(10), ScaleY(70),  // Y坐标调整为70，为更高的状态面板留出空间
         rcClient.right - ScaleX(20),
         subjectListHeight,
         TRUE);
-        
-    MoveWindow(m_hwndInstructionList,
-        ScaleX(10), ScaleY(20) + subjectListHeight,  // 相应调整指令列表位置
+          MoveWindow(m_hwndInstructionList,
+        ScaleX(10), ScaleY(80) + subjectListHeight,  // 相应调整指令列表位置，从60改为80
         rcClient.right - ScaleX(20),
         instructionListHeight,
         TRUE);
@@ -1058,6 +1130,9 @@ void MainWindow::MarkPreviousAsSkipped(int playIndex) {
 void MainWindow::UpdateInstructionListDisplay() {
     // 更新指令列表显示（包括状态文字）
     UpdateInstructionList();
+    
+    // 更新状态面板
+    UpdateStatusPanel();
     
     // 注意：文字颜色通过自定义绘制实现，需要处理 NM_CUSTOMDRAW 消息
     // 暂时通过状态列的文字来提供视觉反馈

@@ -17,7 +17,10 @@ public:
 
 private:
     HWND m_hwnd;
-    HWND m_hwndStatusBar;    HWND m_hwndSubjectList;
+    HWND m_hwndStatusBar;
+    HWND m_hwndStatusPanel;  // 新增：状态面板
+    HFONT m_hStatusPanelFont;  // 新增：状态面板字体句柄
+    HWND m_hwndSubjectList;
     HWND m_hwndInstructionList;
     std::vector<Subject> m_subjects;
     std::vector<Instruction> m_instructions;
@@ -33,10 +36,10 @@ private:
     void AddSubject();
     void DeleteSubject(int index);    void UpdateSubjectList();
     void UpdateInstructionList();    void HandleSubjectListNotify(LPNMHDR lpnmh);
-    LRESULT HandleInstructionListNotify(LPNMHDR lpnmh);    void ShowSubjectContextMenu(int x, int y, int itemIndex);
-    void ShowInstructionContextMenu(int x, int y, int itemIndex);  // 新增：指令右键菜单
+    LRESULT HandleInstructionListNotify(LPNMHDR lpnmh);    void ShowSubjectContextMenu(int x, int y, int itemIndex);    void ShowInstructionContextMenu(int x, int y, int itemIndex);  // 新增：指令右键菜单
     void UpdateNextInstruction();
     void UpdateStatusBar();
+    void UpdateStatusPanel();  // 新增：更新状态面板
     
     // 菜单相关方法
     void ShowHelp();     // 显示帮助信息

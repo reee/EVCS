@@ -10,6 +10,7 @@
 #define IDC_ADD_SUBJECT_BTN    2001
 #define IDC_SUBJECT_LIST       2002
 #define IDC_INSTRUCTION_LIST   2003
+#define IDC_STATUS_PANEL       2004  // 状态面板
 
 // 菜单ID
 #define IDM_DELETE_SUBJECT     3001
