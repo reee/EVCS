@@ -2,7 +2,17 @@
 
 ## 概述
 
-EVCS (Electronic Vehicle Charging System) 是一个使用 C++ 和 CMake 构建的 Windows 应用程序项目。本项目提供了多种编译脚本，位于 `script` 目录下，适用于 Windows 开发环境。
+EVCS (Exam Voice Command System) 是一个考试语音指令系统，使用 C++ 和 CMake 构建的 Windows 应用程序项目。该系统用于在考试期间按照预设时间播放语音指令，支持WAV和MP3格式的音频文件。本项目提供了多种编译脚本，位于 `script` 目录下，适用于 Windows 开发环境。
+
+## 功能特性
+
+- **多格式音频支持**：支持WAV和MP3格式的语音指令文件
+- **精确时间控制**：按照预设时间点自动播放对应的语音指令
+- **实时状态显示**：显示当前指令播放进度、剩余时长和下一条指令信息
+- **音频设备管理**：支持选择不同的音频输出设备
+- **科目管理**：支持多个考试科目的语音指令配置
+- **播放控制**：支持暂停、恢复、停止等播放控制功能
+- **直观界面**：简洁的Windows GUI界面，方便操作使用
 
 ## 系统要求
 
@@ -92,6 +102,29 @@ script\clean.ps1 -Help
    - 等待编译完成
    - 在 `build\Release\` 目录下找到 `EVCS.exe`
 
+## 使用说明
+
+### 音频文件准备
+
+1. **创建subjects目录**：在程序所在目录创建 `subjects` 文件夹
+2. **音频文件格式**：支持WAV和MP3格式的音频文件
+3. **文件命名规则**：音频文件名需要包含播放时间信息
+   - 格式：`科目名_HH-MM-SS_指令描述.wav/mp3`
+   - 示例：`数学_14-30-00_开始答题.wav`、`英语_15-45-30_还有15分钟.mp3`
+
+### 基本使用流程
+
+1. **启动程序**：运行编译生成的 `EVCS.exe`
+2. **选择科目**：从下拉列表中选择要播放的考试科目
+3. **选择音频设备**：根据需要选择音频输出设备
+4. **开始播放**：点击"开始播放"按钮启动语音指令播放
+5. **实时监控**：观察状态面板显示的当前指令信息和播放进度
+6. **控制播放**：使用暂停、恢复、停止按钮控制播放状态
+
+### 详细使用说明
+
+更多详细的使用说明和配置方法，请查看程序目录下的 `README.txt` 文件。
+
 2. **使用 PowerShell**（推荐）：
    ```powershell
    script\build.ps1
@@ -166,20 +199,24 @@ rmdir /s /q build
 ```
 EVCS/
 ├── src/                    # 源代码文件
-│   ├── main.cpp
-│   ├── MainWindow.cpp
-│   ├── MainWindow.h
-│   ├── Subject.cpp
-│   ├── Subject.h
-│   ├── Instruction.cpp
-│   ├── Instruction.h
-│   ├── AudioPlayer.cpp
-│   └── AudioPlayer.h
+│   ├── main.cpp           # 程序入口
+│   ├── MainWindow.cpp     # 主窗口实现
+│   ├── MainWindow.h       # 主窗口头文件
+│   ├── Subject.cpp        # 科目管理实现
+│   ├── Subject.h          # 科目管理头文件
+│   ├── Instruction.cpp    # 指令管理实现
+│   ├── Instruction.h      # 指令管理头文件
+│   ├── AudioPlayer.cpp    # 音频播放器实现
+│   └── AudioPlayer.h      # 音频播放器头文件
 ├── resource/               # 资源文件
-│   ├── app.ico
-│   ├── app.manifest
-│   ├── resource.h
-│   └── resources.rc
+│   ├── app.ico            # 应用程序图标
+│   ├── app.manifest       # 应用程序清单
+│   ├── resource.h         # 资源头文件
+│   └── resources.rc       # 资源脚本
+├── subjects/               # 音频文件目录（运行时创建）
+│   ├── 数学/              # 数学科目音频文件
+│   ├── 英语/              # 英语科目音频文件
+│   └── ...                # 其他科目音频文件
 ├── build/                  # 构建目录（生成）
 ├── script/                 # 编译脚本目录
 │   ├── build.bat          # Windows 批处理编译脚本
@@ -187,13 +224,36 @@ EVCS/
 │   ├── clean.bat          # Windows 清理脚本
 │   └── clean.ps1          # PowerShell 清理脚本
 ├── CMakeLists.txt         # CMake 配置文件
-└── README.md              # 本文件
+├── README.md              # 项目文档（本文件）
+└── README.txt             # 用户使用说明
 ```
+
+## 技术依赖
+
+- **BASS音频库**：用于音频文件播放，支持多种音频格式
+- **Windows API**：GUI界面和系统功能调用
+- **CMake**：跨平台构建系统
+
+## 开发说明
+
+### 核心组件
+
+1. **MainWindow**：主窗口类，负责GUI界面和用户交互
+2. **Subject**：科目管理类，处理科目列表和音频文件扫描
+3. **Instruction**：指令类，管理单个语音指令的时间和播放信息
+4. **AudioPlayer**：音频播放器类，统一使用BASS库播放音频文件
+
+### 编译要求
+
+- Visual Studio 2019/2022
+- CMake 3.10+
+- BASS音频库（已包含在项目中）
 
 ## 联系信息
 
-如果您在使用过程中遇到问题，请查看项目文档或提交 Issue。
+如果您在使用过程中遇到问题，请查看项目文档或访问项目主页：
+https://github.com/reee/EVCS/
 
 ---
 
-*最后更新: 2025-06-11*
+*考试语音指令系统 - 为考试管理提供精确的语音提示服务*

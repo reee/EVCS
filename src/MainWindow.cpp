@@ -214,7 +214,7 @@ void MainWindow::CreateControls() {
         WS_EX_CLIENTEDGE,    // 扩展样式：添加凹陷边框
         L"STATIC",           // 类名
         L"下一指令: 无",       // 初始文本
-        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,  // 样式
+        WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE,  // 样式：使用SS_CENTER让文字居中
         ScaleX(10), ScaleY(10), ScaleX(780), ScaleY(50),   // 位置和大小：高度从30增加到50
         m_hwnd,              // 父窗口
         (HMENU)IDC_STATUS_PANEL,  // 控件ID
@@ -376,7 +376,7 @@ void MainWindow::UpdateStatusBar() {
     // 获取系统音量
     int volume = AudioPlayer::getSystemVolume();
     wchar_t volumeText[64];
-    swprintf_s(volumeText, _countof(volumeText), L"音量: %d%%", volume);
+    swprintf_s(volumeText, _countof(volumeText), L"系统音量: %d%%", volume);
 
     // 检查所有指令的音频文件状态
     wchar_t audioFileStatusText[256] = L"音频文件: 无指令";
@@ -405,8 +405,9 @@ void MainWindow::UpdateStatusBar() {
 
 void MainWindow::UpdateStatusPanel() {
     wchar_t statusText[512] = L"";
+    bool hasCurrentInstruction = false;
     
-    // 第一部分：当前指令信息
+    // 第一部分：检查是否有当前播放的指令
     if (m_currentPlayingIndex >= 0 && 
         static_cast<size_t>(m_currentPlayingIndex) < m_instructions.size()) {
         
@@ -417,56 +418,59 @@ void MainWindow::UpdateStatusPanel() {
             auto now = std::chrono::system_clock::now();
             auto playedDuration = std::chrono::duration_cast<std::chrono::seconds>(
                 now - m_currentPlayingStartTime).count();
-              // 获取音频文件总时长
+            
+            // 获取音频文件总时长
             double totalDuration = AudioPlayer::getAudioDuration(currentInstruction.audioFile);
             int totalSeconds = static_cast<int>(totalDuration);
             int remainingSeconds = (totalSeconds - static_cast<int>(playedDuration)) > 0 ? 
                                  (totalSeconds - static_cast<int>(playedDuration)) : 0;
             
             swprintf_s(statusText, _countof(statusText), 
-                L"当前指令: %s (剩余 %d秒 / 总计 %d秒) | ", 
+                L"当前指令: %s (剩余 %d秒 / 总计 %d秒)", 
                 ConvertUtf8ToWide(currentInstruction.name).c_str(),
                 remainingSeconds,
                 totalSeconds);
+            
+            hasCurrentInstruction = true;
         }
     }
     
-    // 第二部分：下一指令信息
-    wchar_t nextInstructionText[256] = L"下一指令: 无";
-    if (m_nextInstructionIndex >= 0 && 
-        static_cast<size_t>(m_nextInstructionIndex) < m_instructions.size()) {
+    // 第二部分：如果没有当前指令，则显示下一指令信息
+    if (!hasCurrentInstruction) {
+        wcscpy_s(statusText, _countof(statusText), L"下一指令: 无");
         
-        const auto& instruction = m_instructions[m_nextInstructionIndex];
-        
-        // 只有未播放的指令才显示倒计时
-        if (instruction.status == PlaybackStatus::UNPLAYED) {
-            auto now = std::chrono::system_clock::now();
-            auto nowTime = std::chrono::system_clock::to_time_t(now);
-            auto instrTime = std::chrono::system_clock::to_time_t(instruction.playTime);
+        if (m_nextInstructionIndex >= 0 && 
+            static_cast<size_t>(m_nextInstructionIndex) < m_instructions.size()) {
             
-            int timeDiffMinutes = static_cast<int>((instrTime - nowTime) / 60);
+            const auto& instruction = m_instructions[m_nextInstructionIndex];
             
-            if (timeDiffMinutes > 0) {
-                // 距离播放时间还有分钟数
-                swprintf_s(nextInstructionText, _countof(nextInstructionText), 
-                    L"下一指令: %s (%d分钟后)", 
-                    ConvertUtf8ToWide(instruction.name).c_str(), timeDiffMinutes);
-            } else if (timeDiffMinutes == 0) {
-                // 即将播放
-                swprintf_s(nextInstructionText, _countof(nextInstructionText), 
-                    L"下一指令: %s (即将播放)", 
-                    ConvertUtf8ToWide(instruction.name).c_str());
-            } else {
-                // 已到播放时间
-                swprintf_s(nextInstructionText, _countof(nextInstructionText), 
-                    L"下一指令: %s (播放时间已到)", 
-                    ConvertUtf8ToWide(instruction.name).c_str());
+            // 只有未播放的指令才显示倒计时
+            if (instruction.status == PlaybackStatus::UNPLAYED) {
+                auto now = std::chrono::system_clock::now();
+                auto nowTime = std::chrono::system_clock::to_time_t(now);
+                auto instrTime = std::chrono::system_clock::to_time_t(instruction.playTime);
+                
+                int timeDiffMinutes = static_cast<int>((instrTime - nowTime) / 60);
+                
+                if (timeDiffMinutes > 0) {
+                    // 距离播放时间还有分钟数
+                    swprintf_s(statusText, _countof(statusText), 
+                        L"下一指令: %s (%d分钟后)", 
+                        ConvertUtf8ToWide(instruction.name).c_str(), timeDiffMinutes);
+                } else if (timeDiffMinutes == 0) {
+                    // 即将播放
+                    swprintf_s(statusText, _countof(statusText), 
+                        L"下一指令: %s (即将播放)", 
+                        ConvertUtf8ToWide(instruction.name).c_str());
+                } else {
+                    // 已到播放时间
+                    swprintf_s(statusText, _countof(statusText), 
+                        L"下一指令: %s (播放时间已到)", 
+                        ConvertUtf8ToWide(instruction.name).c_str());
+                }
             }
         }
     }
-    
-    // 合并当前指令和下一指令信息
-    wcscat_s(statusText, _countof(statusText), nextInstructionText);
     
     // 更新状态面板文本
     if (m_hwndStatusPanel) {
@@ -593,8 +597,7 @@ void MainWindow::UpdateNextInstruction() {
         m_instructions[m_currentPlayingIndex].status == PlaybackStatus::PLAYING) {
         return;  // 当前有指令正在播放，等待播放完成
     }
-    
-    // 检查并标记过期超过60秒的指令为跳过
+      // 检查并标记过期超过60秒的指令为跳过
     auto now = std::chrono::system_clock::now();
     auto nowTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
         now.time_since_epoch()).count();
@@ -605,8 +608,10 @@ void MainWindow::UpdateNextInstruction() {
             auto instructionTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
                 instruction.playTime.time_since_epoch()).count();
             
-            // 如果指令已过期超过60秒，标记为跳过
-            if (nowTimestamp - instructionTimestamp > 60) {
+            // 只检查过去的指令是否过期
+            // 如果指令时间已过且过期超过60秒，标记为跳过
+            if (instructionTimestamp < nowTimestamp && 
+                (nowTimestamp - instructionTimestamp) > 60) {
                 instruction.status = PlaybackStatus::SKIPPED;
                 hasExpiredInstructions = true;
             }
@@ -938,23 +943,17 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
 void MainWindow::ShowHelp() {
     const wchar_t* helpText = 
         L"考试语音指令系统 - 帮助\n\n"
-        L"功能说明：\n"
-        L"• 添加科目：点击\"文件\" -> \"添加科目\"菜单\n"
-        L"• 删除科目：右键点击科目列表中的项目，选择\"删除科目\"\n"
-        L"• 播放指令：双击指令列表中的项目，或右键选择\"立即播放\"\n"
-        L"• 自动播放：系统会根据设定时间自动播放相应指令\n\n"
-        L"状态栏信息：\n"
-        L"• 音量：显示当前系统音量\n"
-        L"• 音频文件：显示音频文件状态\n"
-        L"• 当前时间：显示系统当前时间\n"
-        L"• 下一指令：显示下一个将要播放的指令及倒计时\n\n"
-        L"支持的科目：\n"
-        L"• 语文 (150分钟)\n"
-        L"• 数学 (120分钟)\n"
-        L"• 英语 (120分钟)\n"
-        L"• 单科 (75分钟)\n"
-        L"• 首选科目 (75分钟)\n"
-        L"• 再选合堂 (160分钟，双场考试)";
+        L"详细使用说明请查看程序目录下的 README.txt 文件。\n\n"
+        L"重要提醒：\n"
+        L"• 请确保程序目录下的 audio 文件夹包含所需的音频文件\n"
+        L"• 英语科目需要自行准备听力音频文件（sy.mp3 和 tl.mp3）\n"
+        L"• 音频文件格式支持：WAV、MP3\n\n"
+        L"基本操作：\n"
+        L"• 添加科目：文件菜单 -> 添加科目\n"
+        L"• 删除科目：右键点击科目列表项目\n"
+        L"• 播放指令：双击指令或右键立即播放\n"
+        L"• 自动播放：系统根据设定时间自动播放\n\n"
+        L"如需更多帮助，请参阅 README.txt 文档。";
     
     MessageBoxW(m_hwnd, helpText, L"帮助", MB_OK | MB_ICONINFORMATION);
 }
@@ -965,6 +964,8 @@ void MainWindow::ShowAbout() {
         L"Examination Voice Command System (EVCS)\n\n"
         L"版本：1.0.0\n"
         L"构建日期：2025年6月\n\n"
+        L"项目地址：\n"
+        L"https://github.com/reee/EVCS/\n\n"
         L"功能特性：\n"
         L"• 自动语音指令播放\n"
         L"• 多种考试科目支持\n"
@@ -1019,7 +1020,7 @@ void MainWindow::UpdateLayoutForDpi() {
         // Part 0: Volume, Width: ScaleX(120) -> Right edge: ScaleX(120)
         // Part 1: Audio File Status, Width: ScaleX(250) -> Right edge: ScaleX(120 + 250) = ScaleX(370)
         // Part 2: Current Time, Width: -1 (remaining)
-        int statusWidths[] = { ScaleX(120), ScaleX(370), -1 };
+        int statusWidths[] = { ScaleX(250), ScaleX(500), -1 };
         SendMessage(m_hwndStatusBar, SB_SETPARTS, 3, (LPARAM)statusWidths);
     }    // 更新状态面板位置和大小
     if (m_hwndStatusPanel) {
@@ -1102,9 +1103,9 @@ void MainWindow::PlayInstruction(int index, bool isManualPlay) {
             now.time_since_epoch()).count();
         auto instructionTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
             instruction.playTime.time_since_epoch()).count();
-        
-        // 如果指令已过期超过60秒，标记为跳过并返回
-        if (nowTimestamp - instructionTimestamp > 60) {
+          // 如果指令已过期超过60秒，标记为跳过并返回
+        if (instructionTimestamp < nowTimestamp && 
+            (nowTimestamp - instructionTimestamp) > 60) {
             instruction.status = PlaybackStatus::SKIPPED;
             UpdateInstructionListDisplay();
             
@@ -1226,9 +1227,9 @@ bool MainWindow::IsTimeToPlayNextInstruction() const {
         now.time_since_epoch()).count();
     auto instructionTimestamp = std::chrono::duration_cast<std::chrono::seconds>(
         instructionTime.time_since_epoch()).count();
-    
-    // 检查指令是否已过期超过60秒
-    if (nowTimestamp - instructionTimestamp > 60) {
+      // 检查指令是否已过期超过60秒
+    if (instructionTimestamp < nowTimestamp && 
+        (nowTimestamp - instructionTimestamp) > 60) {
         // 指令已过期超过60秒，不播放
         return false;
     }
