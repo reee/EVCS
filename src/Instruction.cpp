@@ -7,10 +7,10 @@
 
 namespace {
     struct InstructionTemplate {
-        int offsetMinutes;
+        int offsetSeconds;  // 改为秒为单位，支持更精确的时间控制
         const wchar_t* name;
         const char* file;
-    };    // 辅助函数：将wstring转换为string
+    };// 辅助函数：将wstring转换为string
     std::string WideToUtf8(const wchar_t* wstr) {
         if (!wstr) return std::string();
         int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
@@ -26,7 +26,7 @@ namespace {
         instr.subjectId = subject.id;  // 设置科目ID
         instr.subjectName = subject.name;  // 保留科目名称用于显示
         instr.name = WideToUtf8(temp.name);
-        instr.playTime = subject.startTime + std::chrono::minutes(temp.offsetMinutes);
+        instr.playTime = subject.startTime + std::chrono::seconds(temp.offsetSeconds);
         instr.audioFile = temp.file;
         instructions.push_back(instr);
     }
@@ -37,52 +37,48 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
     
     if (!subject.isDoubleSession) {
         // 检查是否为英语科目
-        bool isEnglish = (subject.name == "英语");
-        
-        if (isEnglish) {
+        bool isEnglish = (subject.name == "英语");        if (isEnglish) {
             // 英语科目的特殊指令序列
             static const InstructionTemplate englishTemplates[] = {
-                {-12, L"考前12分钟", "1kq12.wav"},
-                {-10, L"考前10分钟", "2kq10.wav"},
-                {-9,  L"听力试音", "sy.mp3"},
-                {-5,  L"考前5分钟", "3kq5.wav"},
-                {0,   L"开始考试", "4ksks.wav"},
-                {1,   L"听力", "tl.mp3"},
-                {subject.durationMinutes - 15, L"结束前15分钟", "5jsq15.wav"},
-                {subject.durationMinutes, L"考试结束", "6ksjs.wav"}
+                {-12*60, L"考前12分钟", "1kq12.wav"},    // -720秒
+                {-10*60, L"考前10分钟", "2kq10.wav"},    // -600秒
+                {-9*60,  L"听力试音", "sy.mp3"},         // -540秒
+                {-5*60,  L"考前5分钟", "3kq5.wav"},      // -300秒
+                {0,      L"开始考试", "4ksks.wav"},       // 0秒
+                {20,     L"听力", "tl.mp3"},             // 开始考试后20秒
+                {(subject.durationMinutes - 15)*60, L"结束前15分钟", "5jsq15.wav"},
+                {subject.durationMinutes*60, L"考试结束", "6ksjs.wav"}
             };
             
             for (const auto& temp : englishTemplates) {
                 AddInstruction(instructions, subject, temp);
-            }
-        } else {
+            }        } else {
             // 常规考试指令
             static const InstructionTemplate templates[] = {
-                {-12, L"考前12分钟", "1kq12.wav"},
-                {-10, L"考前10分钟", "2kq10.wav"},
-                {-5,  L"考前5分钟", "3kq5.wav"},
-                {0,   L"开始考试", "4ksks.wav"},
-                {subject.durationMinutes - 15, L"结束前15分钟", "5jsq15.wav"},
-                {subject.durationMinutes, L"考试结束", "6ksjs.wav"}
+                {-12*60, L"考前12分钟", "1kq12.wav"},    // -720秒
+                {-10*60, L"考前10分钟", "2kq10.wav"},    // -600秒
+                {-5*60,  L"考前5分钟", "3kq5.wav"},      // -300秒
+                {0,      L"开始考试", "4ksks.wav"},       // 0秒
+                {(subject.durationMinutes - 15)*60, L"结束前15分钟", "5jsq15.wav"},
+                {subject.durationMinutes*60, L"考试结束", "6ksjs.wav"}
             };
             
             for (const auto& temp : templates) {
                 AddInstruction(instructions, subject, temp);
             }
-        }
-    } else {
+        }    } else {
         // 合堂考试指令
         static const InstructionTemplate templates[] = {
-            {-12, L"第一堂考前12分钟", "1kq12.wav"},
-            {-10, L"第一堂考前10分钟", "2kq10.wav"},
-            {-5,  L"第一堂考前5分钟", "3kq5.wav"},
-            {0,   L"第一堂开始考试", "4ksks.wav"},
-            {60,  L"第一堂结束前15分钟", "5jsq15.wav"},
-            {75,  L"第一堂考试结束", "6ksjs.wav"},
-            {80,  L"第二堂考前5分钟", "3kq5.wav"},
-            {85,  L"第二堂开始考试", "4ksks.wav"},
-            {subject.durationMinutes - 15, L"第二堂结束前15分钟", "5jsq15.wav"},
-            {subject.durationMinutes, L"第二堂考试结束", "6ksjs.wav"}
+            {-12*60, L"第一堂考前12分钟", "1kq12.wav"},   // -720秒
+            {-10*60, L"第一堂考前10分钟", "2kq10.wav"},   // -600秒
+            {-5*60,  L"第一堂考前5分钟", "3kq5.wav"},     // -300秒
+            {0,      L"第一堂开始考试", "4ksks.wav"},      // 0秒
+            {60*60,  L"第一堂结束前15分钟", "5jsq15.wav"}, // 3600秒
+            {75*60,  L"第一堂考试结束", "6ksjs.wav"},      // 4500秒
+            {80*60,  L"第二堂考前5分钟", "3kq5.wav"},      // 4800秒
+            {85*60,  L"第二堂开始考试", "4ksks.wav"},      // 5100秒
+            {(subject.durationMinutes - 15)*60, L"第二堂结束前15分钟", "5jsq15.wav"},
+            {subject.durationMinutes*60, L"第二堂考试结束", "6ksjs.wav"}
         };
         
         for (const auto& temp : templates) {
