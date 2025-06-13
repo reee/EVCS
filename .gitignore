@@ -2,7 +2,6 @@
 build/
 Debug/
 Release/
-x64/
 Win32/
 out/
 
@@ -27,8 +26,8 @@ Makefile
 # Object files
 *.o
 *.obj
-*.lib
-*.dll
+#*.lib
+#*.dll
 *.exp
 *.pdb
 *.ilk

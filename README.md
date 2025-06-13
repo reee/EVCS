@@ -68,9 +68,7 @@ cmake --build . --config Release
 编译成功后，可执行文件将位于以下位置：
 
 - **Windows**: `build\Release\EVCS.exe` 或 `build\Debug\EVCS.exe`
-
-
-然后重新编译项目。
+- 本项目不包含base.dll文件，请自行下载：[Base Audio Lib](https://www.un4seen.com/files/bass24.zip)，并把x64目录下的base.dll放置到EVCS.exe相同目录。
 
 ## 项目结构
 
