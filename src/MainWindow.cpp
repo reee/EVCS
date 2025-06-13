@@ -6,6 +6,7 @@
 #include <string>
 #include <chrono>
 #include <algorithm>
+#include <filesystem>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -372,29 +373,44 @@ void MainWindow::UpdateStatusBar() {
     wchar_t currentTimeText[64];
     swprintf_s(currentTimeText, _countof(currentTimeText), 
         L"当前时间: %02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-    
-    // 获取系统音量
+      // 获取系统音量
     int volume = AudioPlayer::getSystemVolume();
     wchar_t volumeText[64];
     swprintf_s(volumeText, _countof(volumeText), L"系统音量: %d%%", volume);
 
-    // 检查所有指令的音频文件状态
-    wchar_t audioFileStatusText[256] = L"音频文件: 无指令";
-    int missingFileCount = 0;
+    // 分别检查指令文件和听力文件状态
+    wchar_t audioFileStatusText[512] = L"音频文件: 无指令";
+    
     if (!m_instructions.empty()) {
+        // 检查指令文件状态
+        int missingInstructionCount = 0;
         for (const auto& instruction : m_instructions) {
             if (!instruction.checkAudioFileExists()) {
-                missingFileCount++;
+                missingInstructionCount++;
             }
         }
-        if (missingFileCount == 0) {
-            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 全部存在");
+        
+        // 检查听力文件(tl.mp3)状态
+        bool listeningFileExists = std::filesystem::exists("audio/tl.mp3");
+        
+        // 根据检查结果生成状态文本
+        if (missingInstructionCount == 0 && listeningFileExists) {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 全部存在, 听力文件存在");
+        } else if (missingInstructionCount == 0 && !listeningFileExists) {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 全部存在, 听力文件缺失");
+        } else if (missingInstructionCount > 0 && listeningFileExists) {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 缺失%d个, 听力文件存在", missingInstructionCount);
         } else {
-            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: %d 个缺失", missingFileCount);
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 缺失%d个, 听力文件缺失", missingInstructionCount);
         }
     } else {
-        // 如果没有指令，也更新状态栏文本
-         swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令");
+        // 如果没有指令，只检查听力文件
+        bool listeningFileExists = std::filesystem::exists("audio/tl.mp3");
+        if (listeningFileExists) {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令, 听力文件存在");
+        } else {
+            swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令, 听力文件缺失");
+        }
     }
     
     // 设置状态栏的各个分区文本

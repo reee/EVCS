@@ -111,14 +111,10 @@ bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_cloc
     return diff >= 0 && diff < 60;  // 在当前分钟内
 }
 
-// 新增方法：检查音频文件是否存在
+// 新增方法：检查音频文件是否存在（实时检查，不使用缓存）
 bool Instruction::checkAudioFileExists() const {
-    if (!audioFileStatusChecked) {
-        std::string filePath = "audio/" + audioFile; // 在文件名前加上 "audio/" 路径
-        audioFileExists = std::filesystem::exists(filePath);
-        audioFileStatusChecked = true;
-    }
-    return audioFileExists;
+    std::string filePath = "audio/" + audioFile; // 在文件名前加上 "audio/" 路径
+    return std::filesystem::exists(filePath);
 }
 
 COLORREF Instruction::getStatusTextColor() const {

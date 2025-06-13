@@ -21,11 +21,9 @@ struct Instruction {
     std::chrono::system_clock::time_point playTime;
     std::string audioFile;
     PlaybackStatus status;  // 添加播放状态字段
-    mutable bool audioFileExists; // 缓存音频文件是否存在状态
-    mutable bool audioFileStatusChecked; // 标记是否已检查过音频文件状态
 
     // 构造函数，默认状态为未播放
-    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED), audioFileExists(false), audioFileStatusChecked(false) {}    static std::vector<Instruction> generateInstructions(const Subject& subject);
+    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED) {}static std::vector<Instruction> generateInstructions(const Subject& subject);
     std::string getPlayDateTimeString() const;
     bool shouldPlayNow() const;
     bool checkAudioFileExists() const; // 检查音频文件是否存在的方法
