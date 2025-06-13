@@ -91,16 +91,10 @@ EVCS/
 │   ├── app.manifest       # 应用程序清单
 │   ├── resource.h         # 资源头文件
 │   └── resources.rc       # 资源脚本
-├── subjects/               # 音频文件目录（运行时创建）
-│   ├── 数学/              # 数学科目音频文件
-│   ├── 英语/              # 英语科目音频文件
-│   └── ...                # 其他科目音频文件
 ├── build/                  # 构建目录（生成）
 ├── script/                 # 编译脚本目录
 │   ├── build.bat          # Windows 批处理编译脚本
-│   ├── build.ps1          # PowerShell 编译脚本
-│   ├── clean.bat          # Windows 清理脚本
-│   └── clean.ps1          # PowerShell 清理脚本
+│   └── clean.bat          # Windows 清理脚本
 ├── CMakeLists.txt         # CMake 配置文件
 ├── README.md              # 项目文档（本文件）
 └── README.txt             # 用户使用说明
