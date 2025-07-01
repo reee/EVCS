@@ -39,7 +39,7 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
         // 检查是否为英语科目
         bool isEnglish = (subject.name == "英语");        if (isEnglish) {
             // 英语科目的特殊指令序列
-            static const InstructionTemplate englishTemplates[] = {
+            const InstructionTemplate englishTemplates[] = {
                 {-12*60, L"考前12分钟", "1kq12.wav"},    // -720秒
                 {-10*60, L"考前10分钟", "2kq10.wav"},    // -600秒
                 {-9*60,  L"听力试音", "sy.mp3"},         // -540秒
@@ -54,7 +54,7 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
                 AddInstruction(instructions, subject, temp);
             }        } else {
             // 常规考试指令
-            static const InstructionTemplate templates[] = {
+            const InstructionTemplate templates[] = {
                 {-12*60, L"考前12分钟", "1kq12.wav"},    // -720秒
                 {-10*60, L"考前10分钟", "2kq10.wav"},    // -600秒
                 {-5*60,  L"考前5分钟", "3kq5.wav"},      // -300秒
@@ -68,7 +68,7 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
             }
         }    } else {
         // 合堂考试指令
-        static const InstructionTemplate templates[] = {
+        const InstructionTemplate templates[] = {
             {-12*60, L"第一堂考前12分钟", "1kq12.wav"},   // -720秒
             {-10*60, L"第一堂考前10分钟", "2kq10.wav"},   // -600秒
             {-5*60,  L"第一堂考前5分钟", "3kq5.wav"},     // -300秒
