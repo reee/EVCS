@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "AudioPlayer.h"
 #include "resource.h"
+#include "version.h"
 #include <windowsx.h>
 #include <CommCtrl.h>
 #include <string>
@@ -976,10 +977,10 @@ void MainWindow::ShowHelp() {
 
 void MainWindow::ShowAbout() {
     const wchar_t* aboutText = 
-        L"考试语音指令系统\n"
-        L"Examination Voice Command System (EVCS)\n\n"
-        L"版本：1.0.0\n"
-        L"构建日期：2025年6月\n\n"
+        L"" EVCS_PRODUCT_NAME L"\n"
+        L"" EVCS_PRODUCT_NAME_EN L" (EVCS)\n\n"
+        L"版本：" EVCS_VERSION_STRING L"\n"
+        L"构建日期：" EVCS_BUILD_DATE L"\n\n"
         L"项目地址：\n"
         L"https://github.com/reee/EVCS/\n\n"
         L"功能特性：\n"
