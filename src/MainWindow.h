@@ -57,6 +57,7 @@ private:
     void PlayInstruction(int index, bool isManualPlay = false);  // 播放指定指令
     void MarkPreviousAsSkipped(int playIndex);  // 标记之前未播放的指令为跳过
     void UpdateInstructionListDisplay();  // 更新指令列表的显示
+    void EnsureInstructionListFocus();  // 确保焦点跟随当前播放/即将播放的指令
     int FindNextUnplayedInstruction() const;  // 查找下一个未播放的指令
     int FindNextUnplayedInstructionAfter(int index) const;  // 查找指定索引之后的下一个未播放指令
     void SetNextInstruction();  // 设置下一个要播放的指令

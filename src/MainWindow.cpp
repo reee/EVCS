@@ -551,44 +551,44 @@ void MainWindow::UpdateSubjectList() {
 void MainWindow::UpdateInstructionList() {
     // 清空现有项目
     ListView_DeleteAllItems(m_hwndInstructionList);
-    
+
     // 重置下一指令索引，因为列表已更新
     m_nextInstructionIndex = -1;
-    
+
     // 如果没有指令，直接返回
     if (m_instructions.empty()) {
         return;
     }
-    
+
     // 预分配ListView项目数量以提升性能
     ListView_SetItemCount(m_hwndInstructionList, static_cast<int>(m_instructions.size()));
-    
+
     for (size_t i = 0; i < m_instructions.size(); ++i) {
         const auto& instruction = m_instructions[i];
-        
+
         try {
             // 转换字符串
             std::wstring subjectName = ConvertUtf8ToWide(instruction.subjectName);
             std::wstring instrName = ConvertUtf8ToWide(instruction.name);
             std::wstring playTime = ConvertUtf8ToWide(instruction.getPlayDateTimeString());
             std::wstring status = ConvertUtf8ToWide(instruction.getStatusString());
-            
+
             // 创建ListView项目
             LVITEM lvi = {0};
             lvi.mask = LVIF_TEXT;
             lvi.iItem = static_cast<int>(i);
             lvi.iSubItem = 0;
             lvi.pszText = const_cast<LPWSTR>(subjectName.c_str());
-            
+
             // 插入主项目
             int itemIndex = ListView_InsertItem(m_hwndInstructionList, &lvi);
             if (itemIndex != -1) {
                 // 设置子项目文本
-                ListView_SetItemText(m_hwndInstructionList, itemIndex, 1, 
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 1,
                                    const_cast<LPWSTR>(instrName.c_str()));
-                ListView_SetItemText(m_hwndInstructionList, itemIndex, 2, 
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 2,
                                    const_cast<LPWSTR>(playTime.c_str()));
-                ListView_SetItemText(m_hwndInstructionList, itemIndex, 3, 
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 3,
                                    const_cast<LPWSTR>(status.c_str()));
             }
         }
@@ -605,6 +605,9 @@ void MainWindow::UpdateInstructionList() {
             continue;
         }
     }
+
+    // 确保焦点跟随当前播放/即将播放的指令
+    EnsureInstructionListFocus();
 }
 
 void MainWindow::UpdateNextInstruction() {
@@ -653,6 +656,10 @@ void MainWindow::UpdateNextInstruction() {
         // 自动播放下一指令
         PlayInstruction(m_nextInstructionIndex, false);  // 自动播放，不跳过之前的指令
         // 注意：PlayInstruction 方法会自动设置下一指令
+    }
+    // 如果没有到播放时间，确保焦点显示在下一指令上
+    else if (m_nextInstructionIndex >= 0) {
+        EnsureInstructionListFocus();
     }
 }
 
@@ -1153,7 +1160,10 @@ void MainWindow::PlayInstruction(int index, bool isManualPlay) {
     
     // 更新显示
     UpdateInstructionListDisplay();
-    
+
+    // 确保焦点跟随到当前播放的指令
+    EnsureInstructionListFocus();
+
     // 注意：不再立即标记为已播放，等待CheckPlaybackCompletion检查播放完成
     // 设置下一指令（如果需要）
     if (isManualPlay) {
@@ -1180,12 +1190,52 @@ void MainWindow::MarkPreviousAsSkipped(int playIndex) {
 void MainWindow::UpdateInstructionListDisplay() {
     // 更新指令列表显示（包括状态文字）
     UpdateInstructionList();
-    
+
     // 更新状态面板
     UpdateStatusPanel();
-    
+
     // 注意：文字颜色通过自定义绘制实现，需要处理 NM_CUSTOMDRAW 消息
     // 暂时通过状态列的文字来提供视觉反馈
+}
+
+void MainWindow::EnsureInstructionListFocus() {
+    // 确保指令列表有内容
+    if (m_instructions.empty() || !m_hwndInstructionList) {
+        return;
+    }
+
+    int focusIndex = -1;
+
+    // 优先选择当前正在播放的指令
+    if (m_currentPlayingIndex >= 0 &&
+        static_cast<size_t>(m_currentPlayingIndex) < m_instructions.size()) {
+        focusIndex = m_currentPlayingIndex;
+    }
+    // 如果没有正在播放的指令，选择下一个即将播放的指令
+    else if (m_nextInstructionIndex >= 0 &&
+             static_cast<size_t>(m_nextInstructionIndex) < m_instructions.size()) {
+        focusIndex = m_nextInstructionIndex;
+    }
+    // 如果都没有，尝试找到第一个未播放的指令
+    else {
+        for (size_t i = 0; i < m_instructions.size(); ++i) {
+            if (m_instructions[i].status == PlaybackStatus::UNPLAYED) {
+                focusIndex = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+
+    // 如果找到了要聚焦的指令索引
+    if (focusIndex >= 0) {
+        // 选择并设置焦点到该指令
+        ListView_SetItemState(m_hwndInstructionList, focusIndex,
+                            LVIS_SELECTED | LVIS_FOCUSED,
+                            LVIS_SELECTED | LVIS_FOCUSED);
+
+        // 确保该指令可见（滚动到视图中）
+        ListView_EnsureVisible(m_hwndInstructionList, focusIndex, FALSE);
+    }
 }
 
 int MainWindow::FindNextUnplayedInstruction() const {
@@ -1279,43 +1329,46 @@ void MainWindow::ShowInstructionContextMenu(int x, int y, int itemIndex) {
 
 void MainWindow::CheckPlaybackCompletion() {
     // 检查是否有指令正在播放
-    if (m_currentPlayingIndex < 0 || 
+    if (m_currentPlayingIndex < 0 ||
         static_cast<size_t>(m_currentPlayingIndex) >= m_instructions.size()) {
         return;  // 没有指令正在播放
     }
-    
+
     auto& currentInstruction = m_instructions[m_currentPlayingIndex];
-    
+
     // 确认指令状态为播放中
     if (currentInstruction.status != PlaybackStatus::PLAYING) {
         return;  // 指令不是播放中状态
     }
-    
+
     // 获取音频文件总时长
     double totalDuration = AudioPlayer::getAudioDuration(currentInstruction.audioFile);
     if (totalDuration <= 0.0) {
         // 无法获取音频时长，假设播放完成
         currentInstruction.status = PlaybackStatus::PLAYED;
         m_currentPlayingIndex = -1;
-        
+
         // 设置下一指令
         SetNextInstruction();
         UpdateInstructionListDisplay();
         return;
     }
-    
+
     // 计算已播放时长
     auto now = std::chrono::system_clock::now();
     auto playedDuration = std::chrono::duration_cast<std::chrono::seconds>(
         now - m_currentPlayingStartTime).count();
-    
+
     // 如果已播放时长超过总时长，认为播放完成
     if (playedDuration >= static_cast<int>(totalDuration)) {
         currentInstruction.status = PlaybackStatus::PLAYED;
         m_currentPlayingIndex = -1;
-        
+
         // 设置下一指令
         SetNextInstruction();
         UpdateInstructionListDisplay();
+
+        // 播放完成后立即更新焦点到下一个指令
+        EnsureInstructionListFocus();
     }
 }
