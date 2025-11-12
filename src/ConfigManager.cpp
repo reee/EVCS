@@ -92,7 +92,7 @@ std::string ConfigManager::getDefaultConfigPath() const {
 
     // 获取可执行文件所在目录
     std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    return (exeDir / "config" / "默认配置.ini").string();
+    return (exeDir / "config" / "default.ini").string();
 }
 
 std::vector<SubjectConfig> ConfigManager::getSubjects() const {

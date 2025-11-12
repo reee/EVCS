@@ -11,11 +11,11 @@
 #define EVCS_VERSION_FULL     "1.2.0.0"
 
 // 构建信息
-#define EVCS_BUILD_DATE       "2025年7月"
+#define EVCS_BUILD_DATE       "2025年11月"
 #define EVCS_BUILD_YEAR       "2025"
 
 // 产品信息
 #define EVCS_PRODUCT_NAME     "考试语音指令系统"
 #define EVCS_PRODUCT_NAME_EN  "Examination Voice Command System"
-#define EVCS_COMPANY_NAME     "EVCS Team"
+#define EVCS_COMPANY_NAME     "MangQi Tech"
 #define EVCS_COPYRIGHT        "Copyright (C) 2025"
