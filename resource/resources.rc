@@ -24,12 +24,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "EVCS Team"
             VALUE "FileDescription", "考试语音指令系统"
-            VALUE "FileVersion", "1.1.0.0"
+            VALUE "FileVersion", "1.2.0.0"
             VALUE "InternalName", "EVCS"
             VALUE "LegalCopyright", "Copyright (C) 2025"
             VALUE "OriginalFilename", "EVCS.exe"
             VALUE "ProductName", "Examination Voice Command System"
-            VALUE "ProductVersion", "1.1.0.0"
+            VALUE "ProductVersion", "1.2.0.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -53,6 +53,9 @@ BEGIN
     POPUP "文件(&F)"
     BEGIN
         MENUITEM "添加科目(&A)", IDM_FILE_ADD_SUBJECT
+        MENUITEM SEPARATOR
+        MENUITEM "加载配置文件(&L)...", IDM_FILE_LOAD_CONFIG
+        MENUITEM "重新加载配置(&R)", IDM_FILE_RELOAD_CONFIG
     END
     POPUP "帮助(&H)"
     BEGIN

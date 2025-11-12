@@ -1,4 +1,5 @@
 #include "Instruction.h"
+#include "ConfigManager.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -6,10 +7,10 @@
 #include <filesystem> // 添加此行
 
 namespace {
-    struct InstructionTemplate {
+    struct LegacyInstructionTemplate {
         int offsetSeconds;  // 改为秒为单位，支持更精确的时间控制
-        const wchar_t* name;
-        const char* file;
+        std::wstring name;
+        std::string file;
     };// 辅助函数：将wstring转换为string
     std::string WideToUtf8(const wchar_t* wstr) {
         if (!wstr) return std::string();
@@ -21,11 +22,11 @@ namespace {
     }    // 添加指令到列表的辅助函数
     void AddInstruction(std::vector<Instruction>& instructions,
                        const Subject& subject,
-                       const InstructionTemplate& temp) {
+                       const LegacyInstructionTemplate& temp) {
         Instruction instr;
         instr.subjectId = subject.id;  // 设置科目ID
         instr.subjectName = subject.name;  // 保留科目名称用于显示
-        instr.name = WideToUtf8(temp.name);
+        instr.name = WideToUtf8(temp.name.c_str());
         instr.playTime = subject.startTime + std::chrono::seconds(temp.offsetSeconds);
         instr.audioFile = temp.file;
         instructions.push_back(instr);
@@ -34,58 +35,29 @@ namespace {
 
 std::vector<Instruction> Instruction::generateInstructions(const Subject& subject) {
     std::vector<Instruction> instructions;
-    
-    if (!subject.isDoubleSession) {
-        // 检查是否为英语科目
-        bool isEnglish = (subject.name == "英语");        if (isEnglish) {
-            // 英语科目的特殊指令序列
-            const InstructionTemplate englishTemplates[] = {
-                {-12*60, L"考前12分钟", "1kq12.wav"},    // -720秒
-                {-10*60, L"考前10分钟", "2kq10.wav"},    // -600秒
-                {-9*60,  L"听力试音", "sy.mp3"},         // -540秒
-                {-5*60,  L"考前5分钟", "3kq5.wav"},      // -300秒
-                {0,      L"开始考试", "4ksks.wav"},       // 0秒
-                {20,     L"听力", "tl.mp3"},             // 开始考试后20秒
-                {(subject.durationMinutes - 15)*60, L"结束前15分钟", "5jsq15.wav"},
-                {subject.durationMinutes*60, L"考试结束", "6ksjs.wav"}
-            };
-            
-            for (const auto& temp : englishTemplates) {
-                AddInstruction(instructions, subject, temp);
-            }        } else {
-            // 常规考试指令
-            const InstructionTemplate templates[] = {
-                {-12*60, L"考前12分钟", "1kq12.wav"},    // -720秒
-                {-10*60, L"考前10分钟", "2kq10.wav"},    // -600秒
-                {-5*60,  L"考前5分钟", "3kq5.wav"},      // -300秒
-                {0,      L"开始考试", "4ksks.wav"},       // 0秒
-                {(subject.durationMinutes - 15)*60, L"结束前15分钟", "5jsq15.wav"},
-                {subject.durationMinutes*60, L"考试结束", "6ksjs.wav"}
-            };
-            
-            for (const auto& temp : templates) {
-                AddInstruction(instructions, subject, temp);
-            }
-        }    } else {
-        // 合堂考试指令
-        const InstructionTemplate templates[] = {
-            {-12*60, L"第一堂考前12分钟", "1kq12.wav"},   // -720秒
-            {-10*60, L"第一堂考前10分钟", "2kq10.wav"},   // -600秒
-            {-5*60,  L"第一堂考前5分钟", "3kq5.wav"},     // -300秒
-            {0,      L"第一堂开始考试", "4ksks.wav"},      // 0秒
-            {60*60,  L"第一堂结束前15分钟", "5jsq15.wav"}, // 3600秒
-            {75*60,  L"第一堂考试结束", "6ksjs.wav"},      // 4500秒
-            {80*60,  L"第二堂考前5分钟", "3kq5.wav"},      // 4800秒
-            {85*60,  L"第二堂开始考试", "4ksks.wav"},      // 5100秒
-            {(subject.durationMinutes - 15)*60, L"第二堂结束前15分钟", "5jsq15.wav"},
-            {subject.durationMinutes*60, L"第二堂考试结束", "6ksjs.wav"}
-        };
-        
-        for (const auto& temp : templates) {
-            AddInstruction(instructions, subject, temp);
+
+    // 从配置管理器获取指令模板
+    auto& configManager = ConfigManager::getInstance();
+    auto templates = configManager.getInstructionTemplates(subject.name);
+
+    for (const auto& temp : templates) {
+        // 转换为宽字符串
+        std::wstring wideName;
+        int size_needed = MultiByteToWideChar(CP_UTF8, 0, temp.name.c_str(), -1, NULL, 0);
+        if (size_needed > 1) {
+            wideName.resize(size_needed - 1);
+            MultiByteToWideChar(CP_UTF8, 0, temp.name.c_str(), -1, &wideName[0], size_needed);
         }
+
+        // 创建内部模板结构
+        LegacyInstructionTemplate internalTemp;
+        internalTemp.offsetSeconds = temp.offsetSeconds;
+        internalTemp.name = wideName;
+        internalTemp.file = temp.audioFile;
+
+        AddInstruction(instructions, subject, internalTemp);
     }
-    
+
     return instructions;
 }
 
@@ -109,7 +81,11 @@ bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_cloc
 
 // 新增方法：检查音频文件是否存在（实时检查，不使用缓存）
 bool Instruction::checkAudioFileExists() const {
-    std::string filePath = "audio/" + audioFile; // 在文件名前加上 "audio/" 路径
+    // 获取可执行文件所在目录
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+    std::string filePath = (exeDir / "audio" / audioFile).string();
     return std::filesystem::exists(filePath);
 }
 

@@ -46,12 +46,17 @@ void AudioPlayer::playAudioFile(const std::string& filename) {
     if (!s_initialized) {
         initialize();
     }
-    
-    std::filesystem::path audioPath = std::filesystem::current_path() / "audio" / filename;
+
+    // 获取可执行文件所在目录
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+    std::filesystem::path audioPath = exeDir / "audio" / filename;
+
     if (!std::filesystem::exists(audioPath)) {
         return;
     }
-    
+
     // 统一使用BASS播放所有音频文件
     playWithBass(audioPath.string());
 }
@@ -140,12 +145,17 @@ double AudioPlayer::getAudioDuration(const std::string& filename) {
     if (!s_initialized) {
         initialize();
     }
-    
-    std::filesystem::path audioPath = std::filesystem::current_path() / "audio" / filename;
+
+    // 获取可执行文件所在目录
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+    std::filesystem::path audioPath = exeDir / "audio" / filename;
+
     if (!std::filesystem::exists(audioPath)) {
         return 0.0;
     }
-    
+
     // 将路径转换为宽字符串
     std::wstring wideFilePath;
     int size_needed = MultiByteToWideChar(CP_UTF8, 0, audioPath.string().c_str(), -1, NULL, 0);
@@ -153,7 +163,7 @@ double AudioPlayer::getAudioDuration(const std::string& filename) {
         wideFilePath.resize(size_needed - 1);
         MultiByteToWideChar(CP_UTF8, 0, audioPath.string().c_str(), -1, &wideFilePath[0], size_needed);
     }
-    
+
     // 创建音频流但不播放
     HSTREAM stream = BASS_StreamCreateFile(FALSE, wideFilePath.c_str(), 0, 0, BASS_UNICODE);
     if (stream) {
@@ -167,6 +177,6 @@ double AudioPlayer::getAudioDuration(const std::string& filename) {
         }
         BASS_StreamFree(stream);
     }
-    
+
     return 0.0;  // 获取时长失败
 }

@@ -1,4 +1,5 @@
 #include "Subject.h"
+#include "ConfigManager.h"
 #include <map>
 #include <sstream>
 #include <iomanip>
@@ -6,29 +7,27 @@
 // 初始化静态ID计数器
 int Subject::nextId = 0;
 
-// 预设科目信息
-static const std::map<std::string, std::pair<int, bool>> subjectPresets = {
-    {"语文", {150, false}},
-    {"数学", {120, false}},
-    {"英语", {120, false}},
-    {"单科", {75, false}},
-    {"首选科目", {75, false}},
-    {"再选合堂", {160, true}}
-};
-
 Subject Subject::createSubject(const std::string& name) {
     Subject subject;
     subject.name = name;
-    subject.durationMinutes = 90;  // 默认90分钟
-    subject.isDoubleSession = false;  // 默认单场考试
-    
-    auto it = subjectPresets.find(name);
-    if (it != subjectPresets.end()) {
-        subject.durationMinutes = it->second.first;
-        subject.isDoubleSession = it->second.second;
+
+    // 从配置管理器获取科目配置
+    auto& configManager = ConfigManager::getInstance();
+    SubjectConfig config = configManager.getSubjectConfig(name);
+
+    if (!config.name.empty()) {
+        subject.durationMinutes = config.durationMinutes;
+    } else {
+        // 如果没有配置，使用默认值
+        subject.durationMinutes = 90;
     }
-    
+
     return subject;
+}
+
+std::vector<std::string> Subject::getAvailableSubjects() {
+    auto& configManager = ConfigManager::getInstance();
+    return configManager.getSubjectNames();
 }
 
 bool Subject::isValidStartTime(const std::string& timeStr) {

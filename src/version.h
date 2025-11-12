@@ -2,13 +2,13 @@
 
 // 版本信息宏定义
 #define EVCS_VERSION_MAJOR    1
-#define EVCS_VERSION_MINOR    1
+#define EVCS_VERSION_MINOR    2
 #define EVCS_VERSION_PATCH    0
 #define EVCS_VERSION_BUILD    0
 
 // 版本字符串
-#define EVCS_VERSION_STRING   "1.1.0"
-#define EVCS_VERSION_FULL     "1.1.0.0"
+#define EVCS_VERSION_STRING   "1.2.0"
+#define EVCS_VERSION_FULL     "1.2.0.0"
 
 // 构建信息
 #define EVCS_BUILD_DATE       "2025年7月"

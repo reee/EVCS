@@ -52,6 +52,8 @@ private:
     // 菜单相关方法
     void ShowHelp();     // 显示帮助信息
     void ShowAbout();    // 显示关于对话框
+    void LoadConfigFile();     // 加载配置文件
+    void ReloadConfigFile();   // 重新加载配置文件
     
     // 指令播放相关方法
     void PlayInstruction(int index, bool isManualPlay = false);  // 播放指定指令
@@ -70,7 +72,7 @@ private:
     void UpdateLayoutForDpi();
     
     // 辅助函数
-    std::wstring ConvertUtf8ToWide(const std::string& utf8Str);
+    static std::wstring ConvertUtf8ToWide(const std::string& utf8Str);
     
     static constexpr int TIMER_ID = 1;
     static constexpr int TIMER_INTERVAL = 1000;  // 1秒

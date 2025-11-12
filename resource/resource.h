@@ -16,6 +16,8 @@
 #define IDM_DELETE_SUBJECT     3001
 #define IDM_PLAY_INSTRUCTION   3002  // 立即播放指令
 #define IDM_FILE_ADD_SUBJECT   3003  // 文件菜单 - 添加科目
+#define IDM_FILE_LOAD_CONFIG   3006  // 文件菜单 - 加载配置文件
+#define IDM_FILE_RELOAD_CONFIG 3007  // 文件菜单 - 重新加载配置
 #define IDM_HELP_HELP          3004  // 帮助菜单 - 帮助
 #define IDM_HELP_ABOUT         3005  // 帮助菜单 - 关于
 

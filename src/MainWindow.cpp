@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "AudioPlayer.h"
+#include "ConfigManager.h"
 #include "resource.h"
 #include "version.h"
 #include <windowsx.h>
@@ -25,12 +26,19 @@ MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), m_hwndStatusPane
     m_currentPlayingIndex(-1), m_nextInstructionIndex(-1) {
     // 初始化COM
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-    
+
     // 初始化通用控件
     INITCOMMONCONTROLSEX icex;
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
     icex.dwICC = ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES;
     InitCommonControlsEx(&icex);
+
+    // 加载默认配置文件
+    auto& configManager = ConfigManager::getInstance();
+    if (!configManager.loadDefaultConfig()) {
+        // 如果默认配置文件加载失败，显示警告但不阻止程序启动
+        // 这里暂时不显示消息框，因为窗口还没有创建
+    }
 }
 
 MainWindow::~MainWindow() {
@@ -107,6 +115,12 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 switch (LOWORD(wParam)) {
                     case IDM_FILE_ADD_SUBJECT:
                         pThis->AddSubject();
+                        return 0;
+                    case IDM_FILE_LOAD_CONFIG:
+                        pThis->LoadConfigFile();
+                        return 0;
+                    case IDM_FILE_RELOAD_CONFIG:
+                        pThis->ReloadConfigFile();
                         return 0;
                     case IDM_DELETE_SUBJECT: {
                         // 获取当前选择的项目
@@ -351,17 +365,17 @@ void MainWindow::DeleteSubject(int index) {
     UpdateStatusPanel();  // 更新状态面板
 }
 
-// 辅助函数：UTF-8字符串转换为宽字符串
+// 静态辅助函数：UTF-8字符串转换为宽字符串
 std::wstring MainWindow::ConvertUtf8ToWide(const std::string& utf8Str) {
     if (utf8Str.empty()) {
         return std::wstring();
     }
-    
+
     int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, NULL, 0);
     if (size_needed <= 0) {
         return std::wstring();
     }
-    
+
     std::wstring result(size_needed - 1, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, &result[0], size_needed);
     return result;
@@ -392,7 +406,10 @@ void MainWindow::UpdateStatusBar() {
         }
         
         // 检查听力文件(tl.mp3)状态
-        bool listeningFileExists = std::filesystem::exists("audio/tl.mp3");
+        char exePath[MAX_PATH];
+        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+        bool listeningFileExists = std::filesystem::exists(exeDir / "audio" / "tl.mp3");
         
         // 根据检查结果生成状态文本
         if (missingInstructionCount == 0 && listeningFileExists) {
@@ -406,7 +423,10 @@ void MainWindow::UpdateStatusBar() {
         }
     } else {
         // 如果没有指令，只检查听力文件
-        bool listeningFileExists = std::filesystem::exists("audio/tl.mp3");
+        char exePath[MAX_PATH];
+        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+        bool listeningFileExists = std::filesystem::exists(exeDir / "audio" / "tl.mp3");
         if (listeningFileExists) {
             swprintf_s(audioFileStatusText, _countof(audioFileStatusText), L"音频文件: 无指令, 听力文件存在");
         } else {
@@ -794,19 +814,8 @@ void MainWindow::ShowSubjectContextMenu(int x, int y, int itemIndex) {
 }
 
 INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    // 科目信息结构：名称和时长（分钟）
-    static const struct {
-        const wchar_t* name;
-        int duration;
-        bool isDoubleSession;
-    } subjects[] = {
-        {L"语文", 150, false},
-        {L"数学", 120, false},
-        {L"英语", 120, false},
-        {L"单科", 75, false},
-        {L"首选科目", 75, false},
-        {L"再选合堂", 160, true}
-    };
+    // 这个静态数组已不再使用，科目列表现在从ConfigManager动态获取
+    // 移除所有对subjects静态数组的使用
       MainWindow* pMainWindow = nullptr;
     if (msg == WM_INITDIALOG) {
         pMainWindow = reinterpret_cast<MainWindow*>(lParam);
@@ -829,15 +838,13 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
     switch (msg) {        case WM_INITDIALOG: {
             // 初始化科目下拉列表，添加时长信息
             HWND hComboBox = GetDlgItem(hwnd, IDC_SUBJECT_COMBO);
+            auto& configManager = ConfigManager::getInstance();
+            auto subjects = configManager.getSubjects();
             for (const auto& subject : subjects) {
                 wchar_t displayText[128];
-                if (subject.isDoubleSession) {
-                    swprintf_s(displayText, _countof(displayText), 
-                        L"%s (%d分钟，双场考试)", subject.name, subject.duration);
-                } else {
-                    swprintf_s(displayText, _countof(displayText), 
-                        L"%s (%d分钟)", subject.name, subject.duration);
-                }
+                std::wstring wideName = ConvertUtf8ToWide(subject.name);
+                swprintf_s(displayText, _countof(displayText),
+                    L"%s (%d分钟)", wideName.c_str(), subject.durationMinutes);
                 SendMessageW(hComboBox, CB_ADDSTRING, 0, (LPARAM)displayText);
             }            SendMessageW(hComboBox, CB_SETCURSEL, 0, 0);
               // 设置默认日期为今天
@@ -863,15 +870,24 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
             switch (LOWORD(wParam)) {                case IDOK: {
                     wchar_t subjectName[256] = {0};
                     wchar_t startDate[12] = {0};
-                    wchar_t startTime[6] = {0};                    // 获取选中的科目
+                    wchar_t startTime[6] = {0};
+
+                    // 获取选中的科目
                     HWND hComboBox = GetDlgItem(hwnd, IDC_SUBJECT_COMBO);
                     int selectedIndex = static_cast<int>(SendMessageW(hComboBox, CB_GETCURSEL, 0, 0));
-                    if (selectedIndex == CB_ERR || selectedIndex >= _countof(subjects)) {
+
+                    // 获取科目列表来验证索引
+                    auto& configManager = ConfigManager::getInstance();
+                    auto subjects = configManager.getSubjects();
+
+                    if (selectedIndex == CB_ERR || selectedIndex >= subjects.size()) {
                         MessageBoxW(hwnd, L"请选择科目", L"错误", MB_OK | MB_ICONERROR);
                         return TRUE;
                     }
-                    // 从预定义数组中获取原始科目名称
-                    wcscpy_s(subjectName, _countof(subjectName), subjects[selectedIndex].name);
+
+                    // 从配置管理器获取科目名称并转换
+                    std::wstring wideSubjectName = ConvertUtf8ToWide(subjects[selectedIndex].name);
+                    wcscpy_s(subjectName, wideSubjectName.c_str());
                     
                     // 获取考试日期
                     if (GetDlgItemTextW(hwnd, IDC_START_DATE_EDIT, startDate, 12) == 0) {
@@ -1371,4 +1387,116 @@ void MainWindow::CheckPlaybackCompletion() {
         // 播放完成后立即更新焦点到下一个指令
         EnsureInstructionListFocus();
     }
+}
+
+void MainWindow::LoadConfigFile() {
+    // 创建文件选择对话框
+    OPENFILENAMEA ofn;
+    char szFile[260] = {0};  // 文件名缓冲区
+
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = m_hwnd;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = "INI Files\0*.ini\0All Files\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+
+    // 显示文件选择对话框
+    if (GetOpenFileNameA(&ofn)) {
+        // 加载选中的配置文件
+        auto& configManager = ConfigManager::getInstance();
+        if (configManager.loadConfig(szFile)) {
+            // 配置加载成功，重新生成指令列表
+            m_instructions.clear();
+            for (const auto& subject : m_subjects) {
+                auto subjectInstructions = Instruction::generateInstructions(subject);
+                m_instructions.insert(m_instructions.end(),
+                    subjectInstructions.begin(), subjectInstructions.end());
+            }
+
+            // 按播放时间排序
+            std::sort(m_instructions.begin(), m_instructions.end(),
+                [](const Instruction& a, const Instruction& b) {
+                    return a.playTime < b.playTime;
+                });
+
+            // 重置播放状态
+            m_currentPlayingIndex = -1;
+            m_nextInstructionIndex = -1;
+
+            // 更新界面显示
+            UpdateInstructionList();
+            UpdateStatusPanel();
+
+            // 显示成功消息
+            std::wstring message = L"配置文件加载成功！\n\n";
+            message += L"配置文件：";
+            message += ConvertUtf8ToWide(szFile);
+            MessageBoxW(m_hwnd, message.c_str(), L"加载成功", MB_OK | MB_ICONINFORMATION);
+        } else {
+            // 配置加载失败
+            std::wstring message = L"配置文件加载失败！\n\n";
+            message += L"文件：";
+            message += ConvertUtf8ToWide(szFile);
+            message += L"\n\n请检查文件格式是否正确。";
+            MessageBoxW(m_hwnd, message.c_str(), L"加载失败", MB_OK | MB_ICONERROR);
+        }
+    }
+}
+
+void MainWindow::ReloadConfigFile() {
+    auto& configManager = ConfigManager::getInstance();
+    std::string currentConfigPath = configManager.getCurrentConfigPath();
+
+    // 如果没有当前配置文件，使用默认配置
+    if (currentConfigPath.empty()) {
+        if (configManager.loadDefaultConfig()) {
+            currentConfigPath = configManager.getCurrentConfigPath();
+        } else {
+            MessageBoxW(m_hwnd, L"无法加载默认配置文件！", L"重新加载失败", MB_OK | MB_ICONERROR);
+            return;
+        }
+    } else {
+        // 重新加载当前配置文件
+        if (!configManager.loadConfig(currentConfigPath)) {
+            std::wstring message = L"重新加载配置文件失败！\n\n";
+            message += L"文件：";
+            message += ConvertUtf8ToWide(currentConfigPath);
+            MessageBoxW(m_hwnd, message.c_str(), L"重新加载失败", MB_OK | MB_ICONERROR);
+            return;
+        }
+    }
+
+    // 重新生成指令列表
+    m_instructions.clear();
+    for (const auto& subject : m_subjects) {
+        auto subjectInstructions = Instruction::generateInstructions(subject);
+        m_instructions.insert(m_instructions.end(),
+            subjectInstructions.begin(), subjectInstructions.end());
+    }
+
+    // 按播放时间排序
+    std::sort(m_instructions.begin(), m_instructions.end(),
+        [](const Instruction& a, const Instruction& b) {
+            return a.playTime < b.playTime;
+        });
+
+    // 重置播放状态
+    m_currentPlayingIndex = -1;
+    m_nextInstructionIndex = -1;
+
+    // 更新界面显示
+    UpdateInstructionList();
+    UpdateStatusPanel();
+
+    // 显示成功消息
+    std::wstring message = L"配置文件重新加载成功！\n\n";
+    message += L"配置文件：";
+    message += ConvertUtf8ToWide(currentConfigPath);
+    MessageBoxW(m_hwnd, message.c_str(), L"重新加载成功", MB_OK | MB_ICONINFORMATION);
 }

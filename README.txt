@@ -2,7 +2,7 @@
 
 ## 项目信息
 - 项目名称：Examination Voice Command System (EVCS)
-- 版本：1.0.0
+- 版本：1.2.0
 - 项目地址：https://github.com/reee/EVCS/
 
 ## 系统要求
