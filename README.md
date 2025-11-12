@@ -33,7 +33,7 @@ EVCS (Examination Voice Command System) 是一个专为标准化考试设计的�
 ## 系统要求
 
 - **操作系统**：Windows 7 及以上版本 (64位)
-- **依赖库**：BASS Audio Library (需要手动下载 bass.dll)
+- **依赖库**：BASS Audio Library (已包含 bass.dll)
 
 
 ## 编译要求
@@ -72,7 +72,7 @@ script\release.bat
 
 **包含文件**：
 - EVCS.exe（主程序）
-- bass.dll（音频库）
+- bass.dll（音频库，已包含）
 - README.txt（用户文档）
 - config\*.ini（配置文件）
 - audio\ 目录（音频文件目录，用户需自行添加）
@@ -103,11 +103,11 @@ cmake --build . --config Release
 
 ### 📦 BASS 音频库
 
-本项目使用 BASS Audio Library 进行音频播放，**不包含** bass.dll 文件。请按以下步骤获取：
+本项目使用 BASS Audio Library 进行音频播放，**已包含** bass.dll 文件。
 
-1. 下载：[BASS Audio Library](https://www.un4seen.com/files/bass24.zip)
-2. 解压后将 `x64\bass.dll` 复制到可执行文件相同目录
-3. 或者使用 `script\release.bat` 自动复制
+- 发布版本中会自动包含 bass.dll
+- 开发环境中文件位于 `third_party/bass/x64/bass.dll`
+- 如需更新：可从 [BASS 官网](https://www.un4seen.com/files/bass24.zip) 下载最新版本
 
 ## 项目结构
 
