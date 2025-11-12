@@ -1393,6 +1393,7 @@ void MainWindow::LoadConfigFile() {
     // 创建文件选择对话框
     OPENFILENAMEA ofn;
     char szFile[260] = {0};  // 文件名缓冲区
+    char configDir[MAX_PATH] = {0};  // config目录路径
 
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
@@ -1403,7 +1404,16 @@ void MainWindow::LoadConfigFile() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = NULL;
+
+    // 获取程序所在目录下的config文件夹路径
+    GetModuleFileNameA(NULL, configDir, MAX_PATH);
+    char* lastSlash = strrchr(configDir, '\\');
+    if (lastSlash) {
+        *(lastSlash + 1) = '\0';  // 保留最后的反斜杠
+        strcat(configDir, "config");
+    }
+
+    ofn.lpstrInitialDir = configDir;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
     // 显示文件选择对话框
