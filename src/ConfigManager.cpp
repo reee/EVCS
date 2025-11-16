@@ -10,17 +10,39 @@ ConfigManager& ConfigManager::getInstance() {
     return instance;
 }
 
-bool ConfigManager::loadConfig(const std::string& filePath) {
+bool ConfigManager::loadConfig(const std::wstring& filePath) {
     m_currentConfigPath = filePath;
 
     // 清空现有配置
     m_subjectConfigs.clear();
 
-    std::ifstream file(filePath);
-    if (!file.is_open()) {
+    // 使用 Windows API 打开文件 - 方案1
+    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                              NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE) {
         return false;
     }
 
+    // 获取文件大小
+    DWORD fileSize = GetFileSize(hFile, NULL);
+    if (fileSize == INVALID_FILE_SIZE || fileSize == 0) {
+        CloseHandle(hFile);
+        return false;
+    }
+
+    // 读取文件内容
+    std::string fileContent(fileSize, '\0');
+    DWORD bytesRead;
+    if (!ReadFile(hFile, &fileContent[0], fileSize, &bytesRead, NULL)) {
+        CloseHandle(hFile);
+        return false;
+    }
+
+    CloseHandle(hFile);
+
+    // 使用字符串流解析内容
+    std::istringstream file(fileContent);
     std::string line;
     std::string currentSection;
     int lineNum = 0;
@@ -85,14 +107,14 @@ bool ConfigManager::loadConfig(const std::string& filePath) {
     return !m_subjectConfigs.empty();
 }
 
-std::string ConfigManager::getDefaultConfigPath() const {
+std::wstring ConfigManager::getDefaultConfigPath() const {
     // 获取可执行文件所在目录
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
 
     // 获取可执行文件所在目录
     std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    return (exeDir / "config" / "default.ini").string();
+    return (exeDir / "config" / "default.ini").wstring();
 }
 
 std::vector<SubjectConfig> ConfigManager::getSubjects() const {

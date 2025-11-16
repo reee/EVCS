@@ -1,4 +1,5 @@
 #include "AudioPlayer.h"
+#include "StringUtil.h"
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
 #include <filesystem>
@@ -48,8 +49,8 @@ void AudioPlayer::playAudioFile(const std::string& filename) {
     }
 
     // 获取可执行文件所在目录
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
     std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
     std::filesystem::path audioPath = exeDir / "audio" / filename;
 
@@ -57,8 +58,8 @@ void AudioPlayer::playAudioFile(const std::string& filename) {
         return;
     }
 
-    // 统一使用BASS播放所有音频文件
-    playWithBass(audioPath.string());
+    // 统一使用BASS播放所有音频文件，直接传递宽字符串路径
+    playWithBass(audioPath.wstring());
 }
 
 int AudioPlayer::getSystemVolume() {
@@ -114,17 +115,11 @@ int AudioPlayer::getSystemVolume() {
     return static_cast<int>(currentVolume * 100);
 }
 
-bool AudioPlayer::playWithBass(const std::string& filePath) {
-    // 将路径转换为宽字符串以支持Unicode文件名
-    std::wstring wideFilePath;
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, filePath.c_str(), -1, NULL, 0);
-    if (size_needed > 0) {
-        wideFilePath.resize(size_needed - 1);
-        MultiByteToWideChar(CP_UTF8, 0, filePath.c_str(), -1, &wideFilePath[0], size_needed);
-    }
+bool AudioPlayer::playWithBass(const std::wstring& filePath) {
+    // 直接使用宽字符串路径以支持Unicode文件名
     
     // 创建音频流（支持WAV、MP3等多种格式）
-    HSTREAM stream = BASS_StreamCreateFile(FALSE, wideFilePath.c_str(), 0, 0, 
+    HSTREAM stream = BASS_StreamCreateFile(FALSE, filePath.c_str(), 0, 0,
                                          BASS_STREAM_AUTOFREE | BASS_UNICODE);
     
     if (stream) {
@@ -147,8 +142,8 @@ double AudioPlayer::getAudioDuration(const std::string& filename) {
     }
 
     // 获取可执行文件所在目录
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
     std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
     std::filesystem::path audioPath = exeDir / "audio" / filename;
 
@@ -156,13 +151,8 @@ double AudioPlayer::getAudioDuration(const std::string& filename) {
         return 0.0;
     }
 
-    // 将路径转换为宽字符串
-    std::wstring wideFilePath;
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, audioPath.string().c_str(), -1, NULL, 0);
-    if (size_needed > 0) {
-        wideFilePath.resize(size_needed - 1);
-        MultiByteToWideChar(CP_UTF8, 0, audioPath.string().c_str(), -1, &wideFilePath[0], size_needed);
-    }
+    // 直接使用宽字符串路径
+    std::wstring wideFilePath = audioPath.wstring();
 
     // 创建音频流但不播放
     HSTREAM stream = BASS_StreamCreateFile(FALSE, wideFilePath.c_str(), 0, 0, BASS_UNICODE);

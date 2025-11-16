@@ -2,6 +2,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include "StringUtil.h"
 
 struct SubjectConfig {
     std::string name;
@@ -23,7 +24,7 @@ class ConfigManager {
 public:
     static ConfigManager& getInstance();
 
-    bool loadConfig(const std::string& filePath);
+    bool loadConfig(const std::wstring& filePath);
     bool loadDefaultConfig();
 
     std::vector<SubjectConfig> getSubjects() const;
@@ -31,10 +32,10 @@ public:
     std::vector<InstructionTemplate> getInstructionTemplates(const std::string& subjectName) const;
     std::vector<std::string> getSubjectNames() const;
 
-    std::string getCurrentConfigPath() const { return m_currentConfigPath; }
+    std::wstring getCurrentConfigPath() const { return m_currentConfigPath; }
 
 private:
-    std::string getDefaultConfigPath() const;
+    std::wstring getDefaultConfigPath() const;
 
 private:
     ConfigManager() = default;
@@ -48,6 +49,6 @@ private:
     std::string trim(const std::string& str);
 
 private:
-    std::string m_currentConfigPath;
+    std::wstring m_currentConfigPath;
     std::map<std::string, SubjectFullConfig> m_subjectConfigs;
 };

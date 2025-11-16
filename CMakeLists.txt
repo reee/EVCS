@@ -12,6 +12,7 @@ set(SOURCES
     src/Instruction.cpp
     src/AudioPlayer.cpp
     src/ConfigManager.cpp
+    src/StringUtil.cpp
 )
 
 # 添加头文件
@@ -21,6 +22,7 @@ set(HEADERS
     src/Instruction.h
     src/AudioPlayer.h
     src/ConfigManager.h
+    src/StringUtil.h
 )
 
 # 添加资源文件

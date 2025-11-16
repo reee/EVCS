@@ -70,10 +70,8 @@ private:
     int ScaleX(int x) const;
     int ScaleY(int y) const;
     void UpdateLayoutForDpi();
-    
+
     // 辅助函数
-    static std::wstring ConvertUtf8ToWide(const std::string& utf8Str);
-    
     static constexpr int TIMER_ID = 1;
     static constexpr int TIMER_INTERVAL = 1000;  // 1秒
     

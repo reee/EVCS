@@ -3,6 +3,7 @@
 #include "ConfigManager.h"
 #include "resource.h"
 #include "version.h"
+#include "StringUtil.h"
 #include <windowsx.h>
 #include <CommCtrl.h>
 #include <string>
@@ -365,22 +366,6 @@ void MainWindow::DeleteSubject(int index) {
     UpdateStatusPanel();  // 更新状态面板
 }
 
-// 静态辅助函数：UTF-8字符串转换为宽字符串
-std::wstring MainWindow::ConvertUtf8ToWide(const std::string& utf8Str) {
-    if (utf8Str.empty()) {
-        return std::wstring();
-    }
-
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, NULL, 0);
-    if (size_needed <= 0) {
-        return std::wstring();
-    }
-
-    std::wstring result(size_needed - 1, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, &result[0], size_needed);
-    return result;
-}
-
 void MainWindow::UpdateStatusBar() {
     // 获取当前时间
     SYSTEMTIME st;
@@ -406,8 +391,8 @@ void MainWindow::UpdateStatusBar() {
         }
         
         // 检查听力文件(tl.mp3)状态
-        char exePath[MAX_PATH];
-        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
         std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
         bool listeningFileExists = std::filesystem::exists(exeDir / "audio" / "tl.mp3");
         
@@ -423,8 +408,8 @@ void MainWindow::UpdateStatusBar() {
         }
     } else {
         // 如果没有指令，只检查听力文件
-        char exePath[MAX_PATH];
-        GetModuleFileNameA(NULL, exePath, MAX_PATH);
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
         std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
         bool listeningFileExists = std::filesystem::exists(exeDir / "audio" / "tl.mp3");
         if (listeningFileExists) {
@@ -462,9 +447,9 @@ void MainWindow::UpdateStatusPanel() {
             int remainingSeconds = (totalSeconds - static_cast<int>(playedDuration)) > 0 ? 
                                  (totalSeconds - static_cast<int>(playedDuration)) : 0;
             
-            swprintf_s(statusText, _countof(statusText), 
-                L"当前指令: %s (剩余 %d秒 / 总计 %d秒)", 
-                ConvertUtf8ToWide(currentInstruction.name).c_str(),
+            swprintf_s(statusText, _countof(statusText),
+                L"当前指令: %s (剩余 %d秒 / 总计 %d秒)",
+                StringUtil::utf8ToWide(currentInstruction.name).c_str(),
                 remainingSeconds,
                 totalSeconds);
             
@@ -491,19 +476,19 @@ void MainWindow::UpdateStatusPanel() {
                 
                 if (timeDiffMinutes > 0) {
                     // 距离播放时间还有分钟数
-                    swprintf_s(statusText, _countof(statusText), 
-                        L"下一指令: %s (%d分钟后)", 
-                        ConvertUtf8ToWide(instruction.name).c_str(), timeDiffMinutes);
+                    swprintf_s(statusText, _countof(statusText),
+                        L"下一指令: %s (%d分钟后)",
+                        StringUtil::utf8ToWide(instruction.name).c_str(), timeDiffMinutes);
                 } else if (timeDiffMinutes == 0) {
                     // 即将播放
-                    swprintf_s(statusText, _countof(statusText), 
-                        L"下一指令: %s (即将播放)", 
-                        ConvertUtf8ToWide(instruction.name).c_str());
+                    swprintf_s(statusText, _countof(statusText),
+                        L"下一指令: %s (即将播放)",
+                        StringUtil::utf8ToWide(instruction.name).c_str());
                 } else {
                     // 已到播放时间
-                    swprintf_s(statusText, _countof(statusText), 
-                        L"下一指令: %s (播放时间已到)", 
-                        ConvertUtf8ToWide(instruction.name).c_str());
+                    swprintf_s(statusText, _countof(statusText),
+                        L"下一指令: %s (播放时间已到)",
+                        StringUtil::utf8ToWide(instruction.name).c_str());
                 }
             }
         }
@@ -532,9 +517,9 @@ void MainWindow::UpdateSubjectList() {
         
         try {
             // 转换字符串
-            std::wstring subjectName = ConvertUtf8ToWide(subject.name);
-            std::wstring startTime = ConvertUtf8ToWide(subject.getStartDateTimeString());
-            std::wstring endTime = ConvertUtf8ToWide(subject.getEndDateTimeString());
+            std::wstring subjectName = StringUtil::utf8ToWide(subject.name);
+            std::wstring startTime = StringUtil::utf8ToWide(subject.getStartDateTimeString());
+            std::wstring endTime = StringUtil::utf8ToWide(subject.getEndDateTimeString());
             
             // 创建ListView项目
             LVITEM lvi = {0};
@@ -588,10 +573,10 @@ void MainWindow::UpdateInstructionList() {
 
         try {
             // 转换字符串
-            std::wstring subjectName = ConvertUtf8ToWide(instruction.subjectName);
-            std::wstring instrName = ConvertUtf8ToWide(instruction.name);
-            std::wstring playTime = ConvertUtf8ToWide(instruction.getPlayDateTimeString());
-            std::wstring status = ConvertUtf8ToWide(instruction.getStatusString());
+            std::wstring subjectName = StringUtil::utf8ToWide(instruction.subjectName);
+            std::wstring instrName = StringUtil::utf8ToWide(instruction.name);
+            std::wstring playTime = StringUtil::utf8ToWide(instruction.getPlayDateTimeString());
+            std::wstring status = StringUtil::utf8ToWide(instruction.getStatusString());
 
             // 创建ListView项目
             LVITEM lvi = {0};
@@ -786,14 +771,7 @@ void MainWindow::ShowSubjectContextMenu(int x, int y, int itemIndex) {
             auto& subject = m_subjects[itemIndex];
             
             // 转换科目名称用于显示
-            std::wstring subjectName;
-            if (!subject.name.empty()) {
-                int size_needed = MultiByteToWideChar(CP_UTF8, 0, subject.name.c_str(), -1, NULL, 0);
-                if (size_needed > 0) {
-                    subjectName.resize(size_needed - 1);
-                    MultiByteToWideChar(CP_UTF8, 0, subject.name.c_str(), -1, &subjectName[0], size_needed);
-                }
-            }
+            std::wstring subjectName = StringUtil::utf8ToWide(subject.name);
             
             wchar_t confirmMsg[512];
             swprintf_s(confirmMsg, _countof(confirmMsg), 
@@ -842,7 +820,7 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
             auto subjects = configManager.getSubjects();
             for (const auto& subject : subjects) {
                 wchar_t displayText[128];
-                std::wstring wideName = ConvertUtf8ToWide(subject.name);
+                std::wstring wideName = StringUtil::utf8ToWide(subject.name);
                 swprintf_s(displayText, _countof(displayText),
                     L"%s (%d分钟)", wideName.c_str(), subject.durationMinutes);
                 SendMessageW(hComboBox, CB_ADDSTRING, 0, (LPARAM)displayText);
@@ -886,7 +864,7 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                     }
 
                     // 从配置管理器获取科目名称并转换
-                    std::wstring wideSubjectName = ConvertUtf8ToWide(subjects[selectedIndex].name);
+                    std::wstring wideSubjectName = StringUtil::utf8ToWide(subjects[selectedIndex].name);
                     wcscpy_s(subjectName, wideSubjectName.c_str());
                     
                     // 获取考试日期
@@ -900,26 +878,10 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                         MessageBoxW(hwnd, L"请输入开始时间", L"错误", MB_OK | MB_ICONERROR);
                         return TRUE;
                     }                    try {
-                        // 使用Windows API进行字符转换 - 增加缓冲区大小以支持中文字符
-                        char mbSubjectName[768] = {0};  // 增加缓冲区大小，中文字符可能需要更多字节
-                        char mbStartDate[32] = {0};     // 日期缓冲区
-                        char mbStartTime[16] = {0};     // 增加时间缓冲区大小
-                        
-                        // 进行字符转换，并检查转换结果
-                        int subjectResult = WideCharToMultiByte(CP_UTF8, 0, subjectName, -1, 
-                                          mbSubjectName, sizeof(mbSubjectName), NULL, NULL);
-                        int dateResult = WideCharToMultiByte(CP_UTF8, 0, startDate, -1, 
-                                          mbStartDate, sizeof(mbStartDate), NULL, NULL);
-                        int timeResult = WideCharToMultiByte(CP_UTF8, 0, startTime, -1, 
-                                          mbStartTime, sizeof(mbStartTime), NULL, NULL);
-                        
-                        if (subjectResult == 0 || dateResult == 0 || timeResult == 0) {
-                            MessageBoxW(hwnd, L"字符转换失败", L"错误", MB_OK | MB_ICONERROR);
-                            return TRUE;
-                        }
-                          std::string name(mbSubjectName);
-                        std::string dateStr(mbStartDate);
-                        std::string timeStr(mbStartTime);
+                        // 使用StringUtil进行字符转换
+                        std::string name = StringUtil::wideToUtf8(std::wstring(subjectName));
+                        std::string dateStr = StringUtil::wideToUtf8(std::wstring(startDate));
+                        std::string timeStr = StringUtil::wideToUtf8(std::wstring(startTime));
                         
                         if (!Subject::isValidDateTime(dateStr, timeStr)) {
                             MessageBoxW(hwnd, L"请输入正确的日期格式（YYYY-MM-DD）和时间格式（HH:MM）", L"错误", MB_OK | MB_ICONERROR);
@@ -945,17 +907,9 @@ INT_PTR CALLBACK MainWindow::AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wP
                         EndDialog(hwnd, IDOK);
                         return TRUE;
                     }                    catch (const std::exception& e) {
-                        // 显示具体的异常信息 - 使用更安全的字符串转换
+                        // 显示具体的异常信息 - 使用StringUtil进行转换
                         std::string error = e.what();
-                        std::wstring wError;
-                        
-                        if (!error.empty()) {
-                            int size_needed = MultiByteToWideChar(CP_UTF8, 0, error.c_str(), -1, NULL, 0);
-                            if (size_needed > 0) {
-                                wError.resize(size_needed - 1);
-                                MultiByteToWideChar(CP_UTF8, 0, error.c_str(), -1, &wError[0], size_needed);
-                            }
-                        }
+                        std::wstring wError = StringUtil::utf8ToWide(error);
                         
                         wchar_t errorMsg[512];
                         swprintf_s(errorMsg, _countof(errorMsg), L"添加科目时发生错误: %s", wError.c_str());
@@ -1391,34 +1345,34 @@ void MainWindow::CheckPlaybackCompletion() {
 
 void MainWindow::LoadConfigFile() {
     // 创建文件选择对话框
-    OPENFILENAMEA ofn;
-    char szFile[260] = {0};  // 文件名缓冲区
-    char configDir[MAX_PATH] = {0};  // config目录路径
+    OPENFILENAMEW ofn;
+    wchar_t szFile[260] = {0};  // 文件名缓冲区
+    wchar_t configDir[MAX_PATH] = {0};  // config目录路径
 
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = m_hwnd;
     ofn.lpstrFile = szFile;
-    ofn.nMaxFile = sizeof(szFile);
-    ofn.lpstrFilter = "INI Files\0*.ini\0All Files\0*.*\0";
+    ofn.nMaxFile = _countof(szFile);
+    ofn.lpstrFilter = L"INI Files\0*.ini\0All Files\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
 
     // 获取程序所在目录下的config文件夹路径
-    GetModuleFileNameA(NULL, configDir, MAX_PATH);
-    char* lastSlash = strrchr(configDir, '\\');
+    GetModuleFileNameW(NULL, configDir, MAX_PATH);
+    wchar_t* lastSlash = wcsrchr(configDir, L'\\');
     if (lastSlash) {
-        *(lastSlash + 1) = '\0';  // 保留最后的反斜杠
-        strcat(configDir, "config");
+        *(lastSlash + 1) = L'\0';  // 保留最后的反斜杠
+        wcscat_s(configDir, L"config");
     }
 
     ofn.lpstrInitialDir = configDir;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
     // 显示文件选择对话框
-    if (GetOpenFileNameA(&ofn)) {
-        // 加载选中的配置文件
+    if (GetOpenFileNameW(&ofn)) {
+        // 直接使用宽字符串路径，避免编码转换
         auto& configManager = ConfigManager::getInstance();
         if (configManager.loadConfig(szFile)) {
             // 配置加载成功，重新生成指令列表
@@ -1446,13 +1400,13 @@ void MainWindow::LoadConfigFile() {
             // 显示成功消息
             std::wstring message = L"配置文件加载成功！\n\n";
             message += L"配置文件：";
-            message += ConvertUtf8ToWide(szFile);
+            message += szFile;  // 直接使用原始宽字符路径
             MessageBoxW(m_hwnd, message.c_str(), L"加载成功", MB_OK | MB_ICONINFORMATION);
         } else {
             // 配置加载失败
             std::wstring message = L"配置文件加载失败！\n\n";
             message += L"文件：";
-            message += ConvertUtf8ToWide(szFile);
+            message += szFile;  // 直接使用原始宽字符路径
             message += L"\n\n请检查文件格式是否正确。";
             MessageBoxW(m_hwnd, message.c_str(), L"加载失败", MB_OK | MB_ICONERROR);
         }
@@ -1461,7 +1415,7 @@ void MainWindow::LoadConfigFile() {
 
 void MainWindow::ReloadConfigFile() {
     auto& configManager = ConfigManager::getInstance();
-    std::string currentConfigPath = configManager.getCurrentConfigPath();
+    std::wstring currentConfigPath = configManager.getCurrentConfigPath();
 
     // 如果没有当前配置文件，使用默认配置
     if (currentConfigPath.empty()) {
@@ -1476,7 +1430,7 @@ void MainWindow::ReloadConfigFile() {
         if (!configManager.loadConfig(currentConfigPath)) {
             std::wstring message = L"重新加载配置文件失败！\n\n";
             message += L"文件：";
-            message += ConvertUtf8ToWide(currentConfigPath);
+            message += currentConfigPath;
             MessageBoxW(m_hwnd, message.c_str(), L"重新加载失败", MB_OK | MB_ICONERROR);
             return;
         }
@@ -1507,6 +1461,6 @@ void MainWindow::ReloadConfigFile() {
     // 显示成功消息
     std::wstring message = L"配置文件重新加载成功！\n\n";
     message += L"配置文件：";
-    message += ConvertUtf8ToWide(currentConfigPath);
+    message += currentConfigPath;
     MessageBoxW(m_hwnd, message.c_str(), L"重新加载成功", MB_OK | MB_ICONINFORMATION);
 }

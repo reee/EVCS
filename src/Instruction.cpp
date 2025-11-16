@@ -1,5 +1,6 @@
 #include "Instruction.h"
 #include "ConfigManager.h"
+#include "StringUtil.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -11,22 +12,14 @@ namespace {
         int offsetSeconds;  // 改为秒为单位，支持更精确的时间控制
         std::wstring name;
         std::string file;
-    };// 辅助函数：将wstring转换为string
-    std::string WideToUtf8(const wchar_t* wstr) {
-        if (!wstr) return std::string();
-        int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
-        if (size_needed <= 1) return std::string();  // 只有null终止符或转换失败
-        std::string strTo(size_needed - 1, 0);  // 减1去掉null终止符
-        WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &strTo[0], size_needed, NULL, NULL);
-        return strTo;
-    }    // 添加指令到列表的辅助函数
+    };    // 添加指令到列表的辅助函数
     void AddInstruction(std::vector<Instruction>& instructions,
                        const Subject& subject,
                        const LegacyInstructionTemplate& temp) {
         Instruction instr;
         instr.subjectId = subject.id;  // 设置科目ID
         instr.subjectName = subject.name;  // 保留科目名称用于显示
-        instr.name = WideToUtf8(temp.name.c_str());
+        instr.name = StringUtil::wideToUtf8(temp.name);
         instr.playTime = subject.startTime + std::chrono::seconds(temp.offsetSeconds);
         instr.audioFile = temp.file;
         instructions.push_back(instr);
@@ -42,12 +35,7 @@ std::vector<Instruction> Instruction::generateInstructions(const Subject& subjec
 
     for (const auto& temp : templates) {
         // 转换为宽字符串
-        std::wstring wideName;
-        int size_needed = MultiByteToWideChar(CP_UTF8, 0, temp.name.c_str(), -1, NULL, 0);
-        if (size_needed > 1) {
-            wideName.resize(size_needed - 1);
-            MultiByteToWideChar(CP_UTF8, 0, temp.name.c_str(), -1, &wideName[0], size_needed);
-        }
+        std::wstring wideName = StringUtil::utf8ToWide(temp.name);
 
         // 创建内部模板结构
         LegacyInstructionTemplate internalTemp;
@@ -82,10 +70,10 @@ bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_cloc
 // 新增方法：检查音频文件是否存在（实时检查，不使用缓存）
 bool Instruction::checkAudioFileExists() const {
     // 获取可执行文件所在目录
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
     std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    std::string filePath = (exeDir / "audio" / audioFile).string();
+    std::filesystem::path filePath = exeDir / "audio" / audioFile;
     return std::filesystem::exists(filePath);
 }
 
