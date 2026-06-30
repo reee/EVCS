@@ -1,8 +1,10 @@
 #include "PathUtil.h"
+#include "StringUtil.h"
 #include <windows.h>
 
 namespace {
-constexpr const char* AUDIO_DIR = "audio";
+// audio 子目录用宽字符字面量，避免与宽字符 path 拼接时触发 locale 依赖转换。
+constexpr const wchar_t* AUDIO_DIR = L"audio";
 constexpr const wchar_t* CONFIG_DIR = L"config";
 }  // namespace
 
@@ -17,7 +19,10 @@ std::filesystem::path PathUtil::getAppDir() {
 }
 
 std::filesystem::path PathUtil::getAudioPath(const std::string& filename) {
-    return getAppDir() / AUDIO_DIR / filename;
+    // filename 为 UTF-8 字节串（来自 INI），必须先显式转宽字符再拼接，
+    // 否则 path 的 operator/ 接受 std::string 时会走 locale 依赖转换，
+    // 导致中文文件名错码（不变量 §5 + 中文路径一等公民）。
+    return getAppDir() / AUDIO_DIR / StringUtil::utf8ToWide(filename);
 }
 
 std::filesystem::path PathUtil::getConfigPath(const std::wstring& filename) {

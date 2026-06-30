@@ -873,9 +873,10 @@ void MainWindow::ShowHelp() {
 }
 
 void MainWindow::ShowAbout() {
+    // 中文产品名为本地化显示文本，不进 version.h（RC 预处理器无法消化中文）。
     const wchar_t* aboutText =
-        L"" EVCS_PRODUCT_NAME L"\n"
-        L"" EVCS_PRODUCT_NAME_EN L" (EVCS)\n\n"
+        L"考试语音指令系统\n"
+        L"Examination Voice Command System (EVCS)\n\n"
         L"版本：" EVCS_VERSION_STRING L"\n"
         L"构建日期：" EVCS_BUILD_DATE L"\n\n"
         L"项目地址：\n"

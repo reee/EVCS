@@ -1,13 +1,20 @@
 #include "resource.h"
 #include <winres.h>
+#include "../src/version.h"
 
 #pragma code_page(65001)  // UTF-8
+
+// FILEVERSION/PRODUCTVERSION 需要 "a,b,c,d" 逗号形式，
+// version.h 给的是独立 MAJOR/MINOR/PATCH/BUILD 整数宏，在此拼接。
+#define EVCS_RC_VERSION_NUM  EVCS_VERSION_MAJOR,EVCS_VERSION_MINOR,EVCS_VERSION_PATCH,EVCS_VERSION_BUILD
+// 资源字符串保持与 FILEVERSION 一致的 a.b.c.d 形式（EVCS_VERSION_FULL）。
+#define EVCS_RC_VERSION_STR EVCS_VERSION_FULL
 
 /////////////////////////////////////////////////////////////////////////////
 // 版本信息
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,1,0,0
- PRODUCTVERSION 1,1,0,0
+ FILEVERSION EVCS_RC_VERSION_NUM
+ PRODUCTVERSION EVCS_RC_VERSION_NUM
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -22,14 +29,14 @@ BEGIN
     BEGIN
         BLOCK "080404b0"
         BEGIN
-            VALUE "CompanyName", "EVCS Team"
-            VALUE "FileDescription", "考试语音指令系统"
-            VALUE "FileVersion", "1.2.0.0"
+            VALUE "CompanyName", EVCS_COMPANY_NAME
+            VALUE "FileDescription", EVCS_PRODUCT_NAME_EN
+            VALUE "FileVersion", EVCS_RC_VERSION_STR
             VALUE "InternalName", "EVCS"
-            VALUE "LegalCopyright", "Copyright (C) 2025"
+            VALUE "LegalCopyright", EVCS_COPYRIGHT
             VALUE "OriginalFilename", "EVCS.exe"
-            VALUE "ProductName", "Examination Voice Command System"
-            VALUE "ProductVersion", "1.2.0.0"
+            VALUE "ProductName", EVCS_PRODUCT_NAME_EN
+            VALUE "ProductVersion", EVCS_RC_VERSION_STR
         END
     END
     BLOCK "VarFileInfo"

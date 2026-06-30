@@ -4,7 +4,53 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstdio>
 #include <windows.h>
+
+namespace {
+// 防御性上限（不变量 §4）：实际配置远小于这些值，超出视为异常输入并拒绝。
+constexpr DWORD kMaxConfigFileSize = 1 * 1024 * 1024;      // 单文件 ≤ 1MB
+constexpr int kMaxConfigLineCount = 10000;                  // 行数 ≤ 10000
+constexpr int kMaxInstructionsPerSubject = 500;             // 单科目指令 ≤ 500
+constexpr int kMaxInstructionsTotal = 5000;                 // 全局指令 ≤ 5000
+constexpr size_t kMaxAudioFilenameLength = 260;             // 音频文件名长度 ≤ 260
+
+// audioFile 路径穿越防护（不变量 §4/§5）。
+// 允许裸文件名与子目录（如 english/tl.mp3）；禁止绝对路径、盘符、.. 上跳。
+bool isSafeAudioFilename(const std::string& name) {
+    if (name.empty() || name.size() > kMaxAudioFilenameLength) {
+        return false;
+    }
+    // 任何盘符 / 冒号都拒绝
+    if (name.find(':') != std::string::npos) {
+        return false;
+    }
+    // 绝对路径拒绝
+    if (name.front() == '/' || name.front() == '\\') {
+        return false;
+    }
+    // 检查每个路径段，拒绝 ".." 段（按 / 与 \ 切分）
+    size_t start = 0;
+    while (start <= name.size()) {
+        size_t end = name.find_first_of("/\\", start);
+        std::string segment = (end == std::string::npos)
+                                  ? name.substr(start)
+                                  : name.substr(start, end - start);
+        if (segment == "..") {
+            return false;
+        }
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return true;
+}
+
+void logConfigWarning(const char* msg) {
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "[ConfigManager] %s\n", msg);
+    OutputDebugStringA(buf);
+}
+}  // namespace
 
 ConfigManager& ConfigManager::getInstance() {
     static ConfigManager instance;
@@ -31,6 +77,11 @@ bool ConfigManager::loadConfig(const std::wstring& filePath) {
         CloseHandle(hFile);
         return false;
     }
+    if (fileSize > kMaxConfigFileSize) {
+        CloseHandle(hFile);
+        logConfigWarning("config file exceeds size limit, rejected");
+        return false;
+    }
 
     // 读取文件内容
     std::string fileContent(fileSize, '\0');
@@ -47,9 +98,14 @@ bool ConfigManager::loadConfig(const std::wstring& filePath) {
     std::string line;
     std::string currentSection;
     int lineNum = 0;
+    int totalInstructionCount = 0;
 
     while (std::getline(file, line)) {
         lineNum++;
+        if (lineNum > kMaxConfigLineCount) {
+            logConfigWarning("config line count exceeds limit, rejected");
+            return false;
+        }
 
         // 去除BOM标记（如果有）
         if (lineNum == 1 && line.length() >= 3 &&
@@ -98,7 +154,18 @@ bool ConfigManager::loadConfig(const std::wstring& filePath) {
                     // 解析为指令模板，key是时间偏移，value是指令信息
                     InstructionTemplate instruction;
                     if (parseInstructionLine(key, value, instruction)) {
+                        // 防御性上限（不变量 §4）：超限视为配置异常，整体拒绝
+                        // （而非静默截断——静默漏指令在考试场景下更危险）。
+                        if (config.instructions.size() >= kMaxInstructionsPerSubject) {
+                            logConfigWarning("instruction count per subject exceeds limit, rejected");
+                            return false;
+                        }
+                        if (totalInstructionCount >= kMaxInstructionsTotal) {
+                            logConfigWarning("total instruction count exceeds limit, rejected");
+                            return false;
+                        }
                         config.instructions.push_back(instruction);
+                        totalInstructionCount++;
                     }
                 }
             }
@@ -181,6 +248,12 @@ bool ConfigManager::parseInstructionLine(const std::string& timeKey, const std::
     std::string audioFile = trim(config.substr(pipePos1 + 1));
 
     if (name.empty() || audioFile.empty()) {
+        return false;
+    }
+
+    // 路径穿越防护（不变量 §4/§5）：禁止绝对路径/盘符/..上跳
+    if (!isSafeAudioFilename(audioFile)) {
+        logConfigWarning("audioFile rejected: path traversal or invalid");
         return false;
     }
 
