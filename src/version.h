@@ -8,12 +8,12 @@
 // 版本信息宏定义
 #define EVCS_VERSION_MAJOR    1
 #define EVCS_VERSION_MINOR    3
-#define EVCS_VERSION_PATCH    1
+#define EVCS_VERSION_PATCH    2
 #define EVCS_VERSION_BUILD    0
 
 // 版本字符串（ASCII）
-#define EVCS_VERSION_STRING   "1.3.1"
-#define EVCS_VERSION_FULL     "1.3.1.0"
+#define EVCS_VERSION_STRING   "1.3.2"
+#define EVCS_VERSION_FULL     "1.3.2.0"
 
 // 构建信息（ASCII，RC 安全）
 #define EVCS_BUILD_DATE       "2026-06"

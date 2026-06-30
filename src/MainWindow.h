@@ -45,6 +45,11 @@ private:
     std::chrono::steady_clock::time_point m_lastVolumeCheck;
     static constexpr int VOLUME_REFRESH_SECONDS = 5;
 
+    // 「文件存在」列周期补刷节流（避免每秒全量扫描文件系统）
+    std::chrono::steady_clock::time_point m_lastFileExistRefresh;
+    static constexpr int FILE_EXIST_REFRESH_SECONDS = 5;
+    void RefreshFileExistColumn();
+
     void CreateControls();
     void AddSubject();
     void DeleteSubject(int index);

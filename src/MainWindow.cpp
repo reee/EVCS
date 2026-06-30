@@ -46,6 +46,7 @@ MainWindow::MainWindow() : m_hwnd(NULL), m_hwndStatusBar(NULL), m_hwndStatusPane
     }
 
     m_lastVolumeCheck = std::chrono::steady_clock::time_point();
+    m_lastFileExistRefresh = std::chrono::steady_clock::time_point();
 }
 
 MainWindow::~MainWindow() {
@@ -104,6 +105,7 @@ LRESULT CALLBACK MainWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
                 if (wParam == TIMER_ID) {
                     pThis->UpdateStatusBar();
                     pThis->UpdateStatusPanel();
+                    pThis->RefreshFileExistColumn();
                     pThis->CheckPlaybackCompletion();
                     pThis->UpdateNextInstruction();
                 }
@@ -320,6 +322,11 @@ void MainWindow::CreateControls() {
     lvc.pszText = (LPWSTR)L"状态";
     lvc.cx = ScaleX(100);
     ListView_InsertColumn(m_hwndInstructionList, 3, &lvc);
+
+    lvc.iSubItem = 4;
+    lvc.pszText = (LPWSTR)L"文件存在";
+    lvc.cx = ScaleX(80);
+    ListView_InsertColumn(m_hwndInstructionList, 4, &lvc);
 }
 
 void MainWindow::AddSubject() {
@@ -545,6 +552,7 @@ void MainWindow::UpdateInstructionList() {
             std::wstring instrName = StringUtil::utf8ToWide(instruction.name);
             std::wstring playTime = StringUtil::utf8ToWide(instruction.getPlayDateTimeString());
             std::wstring status = StringUtil::utf8ToWide(instruction.getStatusString());
+            std::wstring fileExist = instruction.checkAudioFileExists() ? L"存在" : L"缺失";
 
             LVITEM lvi = {0};
             lvi.mask = LVIF_TEXT;
@@ -560,6 +568,8 @@ void MainWindow::UpdateInstructionList() {
                                    const_cast<LPWSTR>(playTime.c_str()));
                 ListView_SetItemText(m_hwndInstructionList, itemIndex, 3,
                                    const_cast<LPWSTR>(status.c_str()));
+                ListView_SetItemText(m_hwndInstructionList, itemIndex, 4,
+                                   const_cast<LPWSTR>(fileExist.c_str()));
             }
         } catch (const std::exception& e) {
             OutputDebugStringA("UpdateInstructionList error: ");
@@ -573,6 +583,70 @@ void MainWindow::UpdateInstructionList() {
     }
 
     EnsureInstructionListFocus();
+}
+
+void MainWindow::RefreshFileExistColumn() {
+    // 「文件存在」列周期补刷：仅刷新第 4 列文本，不重建整表。
+    // 路径存在性实时检查（不缓存单路径结果），按 5s 节流以降低文件系统开销。
+    if (m_instructions.empty() || m_hwndInstructionList == nullptr) {
+        return;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    if (m_lastFileExistRefresh != std::chrono::steady_clock::time_point() &&
+        std::chrono::duration_cast<std::chrono::seconds>(
+            now - m_lastFileExistRefresh).count() < FILE_EXIST_REFRESH_SECONDS) {
+        return;
+    }
+    m_lastFileExistRefresh = now;
+
+    // RAII 守卫：无论下方是否抛异常（checkAudioFileExists 走 filesystem::exists，
+    // 介质损坏/权限错误时会抛 filesystem_error），都保证 WM_SETREDRAW 被恢复，
+    // 否则列表控件将永久不再重绘，UI 表现为卡死（AGENTS.md §4/§5）。
+    bool redrawDisabled = false;
+    auto enableRedrawGuard = [&]() {
+        if (redrawDisabled && m_hwndInstructionList) {
+            SendMessage(m_hwndInstructionList, WM_SETREDRAW, TRUE, 0);
+            redrawDisabled = false;
+        }
+    };
+
+    // 锁定重绘，避免逐行 SetItemText 造成的闪烁
+    SendMessage(m_hwndInstructionList, WM_SETREDRAW, FALSE, 0);
+    redrawDisabled = true;
+
+    bool changed = false;
+    const int itemCount = ListView_GetItemCount(m_hwndInstructionList);
+    try {
+        for (int i = 0; i < itemCount; ++i) {
+            if (i < 0 || static_cast<size_t>(i) >= m_instructions.size()) {
+                break;
+            }
+            const auto& instruction = m_instructions[i];
+            const wchar_t* newText = instruction.checkAudioFileExists() ? L"存在" : L"缺失";
+
+            wchar_t buf[16] = {0};
+            ListView_GetItemText(m_hwndInstructionList, i, 4, buf, _countof(buf));
+            if (wcscmp(buf, newText) != 0) {
+                ListView_SetItemText(m_hwndInstructionList, i, 4,
+                                     const_cast<LPWSTR>(newText));
+                changed = true;
+            }
+        }
+    } catch (...) {
+        // 文件系统异常吞掉并记录；已写入的变更保留，红绿重绘守卫已恢复重绘
+        OutputDebugStringA("RefreshFileExistColumn: filesystem error ignored\n");
+    }
+
+    enableRedrawGuard();
+
+    // 仅在确有文本变更时失效重绘，避免每 5s 无谓重绘
+    if (changed && m_hwndInstructionList) {
+        RECT rcClient = {0};
+        if (GetClientRect(m_hwndInstructionList, &rcClient)) {
+            InvalidateRect(m_hwndInstructionList, &rcClient, FALSE);
+        }
+    }
 }
 
 void MainWindow::UpdateNextInstruction() {
@@ -658,6 +732,23 @@ LRESULT MainWindow::HandleInstructionListNotify(LPNMHDR lpnmh) {
                     if (itemIndex >= 0 && static_cast<size_t>(itemIndex) < m_instructions.size()) {
                         COLORREF textColor = m_instructions[itemIndex].getStatusTextColor();
                         lpCustomDraw->clrText = textColor;
+                    }
+                    // 请求子项绘制通知，以便对「文件存在」列单独上色
+                    return CDRF_NOTIFYSUBITEMDRAW;
+                }
+
+                case CDDS_SUBITEM | CDDS_ITEMPREPAINT: {
+                    // 第 4 列（文件存在）按存在/缺失上色；其余列沿用默认行色
+                    if (lpCustomDraw->iSubItem == 4) {
+                        wchar_t buf[16] = {0};
+                        ListView_GetItemText(m_hwndInstructionList,
+                                             (int)lpCustomDraw->nmcd.dwItemSpec, 4,
+                                             buf, _countof(buf));
+                        if (wcscmp(buf, L"缺失") == 0) {
+                            lpCustomDraw->clrText = RGB(200, 0, 0);
+                        } else if (wcscmp(buf, L"存在") == 0) {
+                            lpCustomDraw->clrText = RGB(0, 128, 0);
+                        }
                     }
                     return CDRF_NEWFONT;
                 }
@@ -980,6 +1071,7 @@ void MainWindow::UpdateLayoutForDpi() {
         ListView_SetColumnWidth(m_hwndInstructionList, 1, ScaleX(260));
         ListView_SetColumnWidth(m_hwndInstructionList, 2, ScaleX(240));
         ListView_SetColumnWidth(m_hwndInstructionList, 3, ScaleX(100));
+        ListView_SetColumnWidth(m_hwndInstructionList, 4, ScaleX(80));
     }
 
     SendMessage(m_hwndStatusBar, WM_SIZE, 0, 0);
