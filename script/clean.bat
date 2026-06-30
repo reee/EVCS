@@ -1,43 +1,68 @@
 @echo off
-REM EVCS项目清理脚本
-REM 作者: GitHub Copilot
-REM 创建日期: 2025-06-11
+setlocal enabledelayedexpansion
 
 echo ==================================================
-echo               EVCS 项目清理脚本
+echo               EVCS Clean Script
 echo ==================================================
 
-REM 获取脚本所在目录，然后定位到项目根目录
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_DIR=%SCRIPT_DIR%.."
 cd /d "%PROJECT_DIR%"
 
-echo 项目根目录: %PROJECT_DIR%
+echo Project root: %PROJECT_DIR%
+echo.
 
-REM 设置构建目录
+REM Clean build directory
 set "BUILD_DIR=%PROJECT_DIR%\build"
-
 if exist "%BUILD_DIR%" (
-    echo 正在清理构建目录: %BUILD_DIR%
+    echo Cleaning build directory: %BUILD_DIR%
     rmdir /s /q "%BUILD_DIR%"
     if errorlevel 1 (
-        echo 警告: 无法完全清理构建目录，可能有文件正在使用中
+        echo   [WARN] Could not fully clean (files may be in use)
     ) else (
-        echo 构建目录已清理完成
+        echo   [OK]
     )
 ) else (
-    echo 构建目录不存在，无需清理
+    echo Build directory not found, skipping.
 )
 
-REM 清理临时文件
+REM Clean release directory
+set "RELEASE_DIR=%PROJECT_DIR%\release"
+if exist "%RELEASE_DIR%" (
+    echo Cleaning release directory: %RELEASE_DIR%
+    rmdir /s /q "%RELEASE_DIR%"
+    if errorlevel 1 (
+        echo   [WARN] Could not fully clean (files may be in use)
+    ) else (
+        echo   [OK]
+    )
+) else (
+    echo Release directory not found, skipping.
+)
+
+REM Clean debug directory
+set "DEBUG_DIR=%PROJECT_DIR%\debug"
+if exist "%DEBUG_DIR%" (
+    echo Cleaning debug directory: %DEBUG_DIR%
+    rmdir /s /q "%DEBUG_DIR%"
+    if errorlevel 1 (
+        echo   [WARN] Could not fully clean (files may be in use)
+    ) else (
+        echo   [OK]
+    )
+) else (
+    echo Debug directory not found, skipping.
+)
+
+REM Clean temp files
 echo.
-echo 正在清理临时文件...
+echo Cleaning temp files...
 if exist "*.tmp" del /q "*.tmp"
 if exist "*.log" del /q "*.log"
 
 echo.
 echo ==================================================
-echo               清理完成！
+echo               Clean complete!
 echo ==================================================
 echo.
 pause
