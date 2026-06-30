@@ -1,5 +1,6 @@
 #include "AudioPlayer.h"
 #include "StringUtil.h"
+#include "PathUtil.h"
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
 #include <filesystem>
@@ -7,11 +8,12 @@
 #include <cctype>
 #include <windows.h>
 #include <mmsystem.h>
+#include <cstdio>
 
-// 包含Bass Audio Library
+// 包含 Bass Audio Library
 #include "../third_party/bass/bass.h"
 
-// 根据平台链接对应的Bass库
+// 根据平台链接对应的 Bass 库
 #ifdef _WIN64
 #pragma comment(lib, "../third_party/bass/x64/bass.lib")
 #else
@@ -21,45 +23,101 @@
 #pragma comment(lib, "winmm.lib")
 
 bool AudioPlayer::s_initialized = false;
+DWORD AudioPlayer::s_currentStream = 0;
+
+namespace {
+void logBassError(const char* context) {
+    int code = BASS_ErrorGetCode();
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "[BASS] %s failed, error=%d\n", context, code);
+    OutputDebugStringA(buf);
+}
+}  // namespace
 
 bool AudioPlayer::initialize() {
     if (s_initialized) {
         return true;
     }
-    
-    // 初始化Bass库
+
+    // 初始化 Bass 库（-1 表示使用默认输出设备）
     if (BASS_Init(-1, 44100, 0, NULL, NULL)) {
         s_initialized = true;
         return true;
-    } else {
-        return false;
     }
+
+    logBassError("BASS_Init");
+    return false;
 }
 
 void AudioPlayer::cleanup() {
     if (s_initialized) {
+        stop();
         BASS_Free();
         s_initialized = false;
     }
 }
 
-void AudioPlayer::playAudioFile(const std::string& filename) {
+bool AudioPlayer::playAudioFile(const std::string& filename) {
     if (!s_initialized) {
-        initialize();
+        if (!initialize()) {
+            return false;
+        }
     }
 
-    // 获取可执行文件所在目录
-    wchar_t exePath[MAX_PATH];
-    GetModuleFileNameW(NULL, exePath, MAX_PATH);
-    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    std::filesystem::path audioPath = exeDir / "audio" / filename;
-
+    std::filesystem::path audioPath = PathUtil::getAudioPath(filename);
     if (!std::filesystem::exists(audioPath)) {
-        return;
+        return false;
     }
 
-    // 统一使用BASS播放所有音频文件，直接传递宽字符串路径
-    playWithBass(audioPath.wstring());
+    // 停止上一次播放（如有）
+    stop();
+
+    // 不使用 BASS_STREAM_AUTOFREE：保留句柄以便查询活跃状态
+    // 播放结束/出错时由 stop()/cleanup() 显式释放
+    std::wstring widePath = audioPath.wstring();
+    HSTREAM stream = BASS_StreamCreateFile(FALSE, widePath.c_str(), 0, 0, BASS_UNICODE);
+    if (!stream) {
+        logBassError("BASS_StreamCreateFile");
+        return false;
+    }
+
+    if (!BASS_ChannelPlay(stream, FALSE)) {
+        logBassError("BASS_ChannelPlay");
+        BASS_StreamFree(stream);
+        return false;
+    }
+
+    s_currentStream = stream;
+    return true;
+}
+
+bool AudioPlayer::isPlaying() {
+    if (!s_initialized || !s_currentStream) {
+        return false;
+    }
+    // BASS_ACTIVE_PLAYING / BASS_ACTIVE_STALLED 都视为"占用中"
+    DWORD active = BASS_ChannelIsActive(s_currentStream);
+    return active == BASS_ACTIVE_PLAYING || active == BASS_ACTIVE_STALLED;
+}
+
+void AudioPlayer::stop() {
+    if (s_currentStream) {
+        BASS_ChannelStop(s_currentStream);
+        BASS_StreamFree(s_currentStream);
+        s_currentStream = 0;
+    }
+}
+
+double AudioPlayer::getCurrentStreamDuration() {
+    if (!s_initialized || !s_currentStream) {
+        return 0.0;
+    }
+    // 直接查询当前播放通道长度，无需另开流
+    QWORD lengthBytes = BASS_ChannelGetLength(s_currentStream, BASS_POS_BYTE);
+    if (lengthBytes == (QWORD)-1) {
+        return 0.0;
+    }
+    return BASS_ChannelBytes2Seconds(s_currentStream, lengthBytes);
 }
 
 int AudioPlayer::getSystemVolume() {
@@ -68,105 +126,65 @@ int AudioPlayer::getSystemVolume() {
     IMMDevice* defaultDevice = NULL;
     IAudioEndpointVolume* endpointVolume = NULL;
     float currentVolume = 0;
-    
-    // 创建设备枚举器
+
     hr = CoCreateInstance(
         __uuidof(MMDeviceEnumerator),
         NULL,
         CLSCTX_ALL,
         __uuidof(IMMDeviceEnumerator),
-        (void**)&deviceEnumerator
-    );
-    
+        (void**)&deviceEnumerator);
     if (FAILED(hr)) return 0;
-    
-    // 获取默认音频终端
+
     hr = deviceEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice);
     if (FAILED(hr)) {
         deviceEnumerator->Release();
         return 0;
     }
-    
-    // 获取音量控制接口
+
     hr = defaultDevice->Activate(
         __uuidof(IAudioEndpointVolume),
         CLSCTX_ALL,
         NULL,
-        (void**)&endpointVolume
-    );
-    
+        (void**)&endpointVolume);
     if (FAILED(hr)) {
         defaultDevice->Release();
         deviceEnumerator->Release();
         return 0;
     }
-    
-    // 获取主音量
+
     hr = endpointVolume->GetMasterVolumeLevelScalar(&currentVolume);
-    
-    // 释放COM接口
+
     endpointVolume->Release();
     defaultDevice->Release();
     deviceEnumerator->Release();
-    
-    if (FAILED(hr)) return 0;
-    
-    // 将浮点音量转换为百分比
-    return static_cast<int>(currentVolume * 100);
-}
 
-bool AudioPlayer::playWithBass(const std::wstring& filePath) {
-    // 直接使用宽字符串路径以支持Unicode文件名
-    
-    // 创建音频流（支持WAV、MP3等多种格式）
-    HSTREAM stream = BASS_StreamCreateFile(FALSE, filePath.c_str(), 0, 0,
-                                         BASS_STREAM_AUTOFREE | BASS_UNICODE);
-    
-    if (stream) {
-        // 播放音频流
-        BOOL result = BASS_ChannelPlay(stream, FALSE);
-        if (result) {
-            return true;
-        } else {
-            BASS_StreamFree(stream);
-            return false;
-        }
-    }
-    
-    return false;
+    if (FAILED(hr)) return 0;
+    return static_cast<int>(currentVolume * 100);
 }
 
 double AudioPlayer::getAudioDuration(const std::string& filename) {
     if (!s_initialized) {
-        initialize();
+        if (!initialize()) {
+            return 0.0;
+        }
     }
 
-    // 获取可执行文件所在目录
-    wchar_t exePath[MAX_PATH];
-    GetModuleFileNameW(NULL, exePath, MAX_PATH);
-    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    std::filesystem::path audioPath = exeDir / "audio" / filename;
-
+    std::filesystem::path audioPath = PathUtil::getAudioPath(filename);
     if (!std::filesystem::exists(audioPath)) {
         return 0.0;
     }
 
-    // 直接使用宽字符串路径
-    std::wstring wideFilePath = audioPath.wstring();
-
-    // 创建音频流但不播放
-    HSTREAM stream = BASS_StreamCreateFile(FALSE, wideFilePath.c_str(), 0, 0, BASS_UNICODE);
-    if (stream) {
-        // 获取音频时长（以字节为单位）
-        QWORD lengthBytes = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
-        if (lengthBytes != (QWORD)-1) {
-            // 转换为秒
-            double lengthSeconds = BASS_ChannelBytes2Seconds(stream, lengthBytes);
-            BASS_StreamFree(stream);
-            return lengthSeconds;
-        }
-        BASS_StreamFree(stream);
+    std::wstring widePath = audioPath.wstring();
+    HSTREAM stream = BASS_StreamCreateFile(FALSE, widePath.c_str(), 0, 0, BASS_UNICODE);
+    if (!stream) {
+        return 0.0;
     }
 
-    return 0.0;  // 获取时长失败
+    double lengthSeconds = 0.0;
+    QWORD lengthBytes = BASS_ChannelGetLength(stream, BASS_POS_BYTE);
+    if (lengthBytes != (QWORD)-1) {
+        lengthSeconds = BASS_ChannelBytes2Seconds(stream, lengthBytes);
+    }
+    BASS_StreamFree(stream);
+    return lengthSeconds;
 }

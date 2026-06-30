@@ -19,21 +19,31 @@ public:
 private:
     HWND m_hwnd;
     HWND m_hwndStatusBar;
-    HWND m_hwndStatusPanel;  // 新增：状态面板
-    HFONT m_hStatusPanelFont;  // 新增：状态面板字体句柄
+    HWND m_hwndStatusPanel;
+    HFONT m_hStatusPanelFont;
     HWND m_hwndSubjectList;
-    HWND m_hwndInstructionList;    std::vector<Subject> m_subjects;
+    HWND m_hwndInstructionList;
+
+    std::vector<Subject> m_subjects;
     std::vector<Instruction> m_instructions;
-    
-    // DPI相关成员
+
+    // DPI 相关成员
     UINT m_dpi;
     float m_dpiScaleX;
     float m_dpiScaleY;
-    
+
     // 指令列表状态相关
-    int m_currentPlayingIndex;  // 当前播放的指令索引，-1表示没有播放
-    int m_nextInstructionIndex; // 下一个要播放的指令索引，-1表示没有下一个指令
-    std::chrono::system_clock::time_point m_currentPlayingStartTime; // 当前播放指令的开始时间
+    int m_currentPlayingIndex;  // 当前播放的指令索引，-1 表示无
+    int m_nextInstructionIndex; // 下一个要播放的指令索引，-1 表示无
+    std::chrono::system_clock::time_point m_currentPlayingStartTime;
+
+    // 音频文件状态缓存（避免每秒全量扫描文件系统）
+    int m_cachedMissingInstructionCount = -1;  // <0 表示缓存失效
+
+    // 系统音量节流（避免每秒做 COM 设备枚举）
+    int m_cachedSystemVolume = 0;
+    std::chrono::steady_clock::time_point m_lastVolumeCheck;
+    static constexpr int VOLUME_REFRESH_SECONDS = 5;
 
     void CreateControls();
     void AddSubject();
@@ -43,29 +53,31 @@ private:
     void HandleSubjectListNotify(LPNMHDR lpnmh);
     LRESULT HandleInstructionListNotify(LPNMHDR lpnmh);
     void ShowSubjectContextMenu(int x, int y, int itemIndex);
-    void ShowInstructionContextMenu(int x, int y, int itemIndex);  // 新增：指令右键菜单
+    void ShowInstructionContextMenu(int x, int y, int itemIndex);
     void UpdateNextInstruction();
     void UpdateStatusBar();
-    void UpdateStatusPanel();  // 新增：更新状态面板
-    void CheckPlaybackCompletion();  // 新增：检查播放完成状态
-    
+    void UpdateStatusPanel();
+    void CheckPlaybackCompletion();
+
     // 菜单相关方法
-    void ShowHelp();     // 显示帮助信息
-    void ShowAbout();    // 显示关于对话框
-    void LoadConfigFile();     // 加载配置文件
-    void ReloadConfigFile();   // 重新加载配置文件
-    
+    void ShowHelp();
+    void ShowAbout();
+    void LoadConfigFile();
+    void ReloadConfigFile();
+    void InvalidateAudioCache();  // 科目/指令变动时调用，使音频文件状态缓存失效
+    void RegenerateInstructions();  // 根据当前科目与配置重生成并排序指令列表
+
     // 指令播放相关方法
-    void PlayInstruction(int index, bool isManualPlay = false);  // 播放指定指令
-    void MarkPreviousAsSkipped(int playIndex);  // 标记之前未播放的指令为跳过
-    void UpdateInstructionListDisplay();  // 更新指令列表的显示
-    void EnsureInstructionListFocus();  // 确保焦点跟随当前播放/即将播放的指令
-    int FindNextUnplayedInstruction() const;  // 查找下一个未播放的指令
-    int FindNextUnplayedInstructionAfter(int index) const;  // 查找指定索引之后的下一个未播放指令
-    void SetNextInstruction();  // 设置下一个要播放的指令
-    bool IsTimeToPlayNextInstruction() const;  // 检查是否到时间播放下一个指令
-    
-    // DPI相关函数
+    void PlayInstruction(int index, bool isManualPlay = false);
+    void MarkPreviousAsSkipped(int playIndex);
+    void UpdateInstructionListDisplay();
+    void EnsureInstructionListFocus();
+    int FindNextUnplayedInstruction() const;
+    int FindNextUnplayedInstructionAfter(int index) const;
+    void SetNextInstruction();
+    bool IsTimeToPlayNextInstruction() const;
+
+    // DPI 相关函数
     void UpdateDpiInfo();
     int ScaleX(int x) const;
     int ScaleY(int y) const;
@@ -73,8 +85,8 @@ private:
 
     // 辅助函数
     static constexpr int TIMER_ID = 1;
-    static constexpr int TIMER_INTERVAL = 1000;  // 1秒
-    
+    static constexpr int TIMER_INTERVAL = 1000;  // 1 秒
+
     // 对话框过程
     static INT_PTR CALLBACK AddSubjectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 };

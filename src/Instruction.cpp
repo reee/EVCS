@@ -1,49 +1,26 @@
 #include "Instruction.h"
 #include "ConfigManager.h"
-#include "StringUtil.h"
+#include "PathUtil.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
 #include <windows.h>
-#include <filesystem> // 添加此行
-
-namespace {
-    struct LegacyInstructionTemplate {
-        int offsetSeconds;  // 改为秒为单位，支持更精确的时间控制
-        std::wstring name;
-        std::string file;
-    };    // 添加指令到列表的辅助函数
-    void AddInstruction(std::vector<Instruction>& instructions,
-                       const Subject& subject,
-                       const LegacyInstructionTemplate& temp) {
-        Instruction instr;
-        instr.subjectId = subject.id;  // 设置科目ID
-        instr.subjectName = subject.name;  // 保留科目名称用于显示
-        instr.name = StringUtil::wideToUtf8(temp.name);
-        instr.playTime = subject.startTime + std::chrono::seconds(temp.offsetSeconds);
-        instr.audioFile = temp.file;
-        instructions.push_back(instr);
-    }
-}
+#include <filesystem>
 
 std::vector<Instruction> Instruction::generateInstructions(const Subject& subject) {
     std::vector<Instruction> instructions;
 
-    // 从配置管理器获取指令模板
     auto& configManager = ConfigManager::getInstance();
     auto templates = configManager.getInstructionTemplates(subject.name);
 
     for (const auto& temp : templates) {
-        // 转换为宽字符串
-        std::wstring wideName = StringUtil::utf8ToWide(temp.name);
-
-        // 创建内部模板结构
-        LegacyInstructionTemplate internalTemp;
-        internalTemp.offsetSeconds = temp.offsetSeconds;
-        internalTemp.name = wideName;
-        internalTemp.file = temp.audioFile;
-
-        AddInstruction(instructions, subject, internalTemp);
+        Instruction instr;
+        instr.subjectId = subject.id;
+        instr.subjectName = subject.name;
+        instr.name = temp.name;  // UTF-8 直接使用，无需往返转换
+        instr.playTime = subject.startTime + std::chrono::seconds(temp.offsetSeconds);
+        instr.audioFile = temp.audioFile;
+        instructions.push_back(instr);
     }
 
     return instructions;
@@ -62,33 +39,23 @@ std::string Instruction::getPlayDateTimeString() const {
     return ss.str();
 }
 
-bool Instruction::shouldPlayNow() const {    auto now = std::chrono::system_clock::now();
-    auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - playTime).count();
-    return diff >= 0 && diff < 60;  // 在当前分钟内
-}
-
-// 新增方法：检查音频文件是否存在（实时检查，不使用缓存）
+// 实时检查音频文件是否存在（不使用缓存）
 bool Instruction::checkAudioFileExists() const {
-    // 获取可执行文件所在目录
-    wchar_t exePath[MAX_PATH];
-    GetModuleFileNameW(NULL, exePath, MAX_PATH);
-    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    std::filesystem::path filePath = exeDir / "audio" / audioFile;
-    return std::filesystem::exists(filePath);
+    return std::filesystem::exists(PathUtil::getAudioPath(audioFile));
 }
 
 COLORREF Instruction::getStatusTextColor() const {
     switch (status) {
         case PlaybackStatus::UNPLAYED:
-            return RGB(0, 0, 0);        // 黑色文字
+            return RGB(0, 0, 0);        // 黑色
         case PlaybackStatus::PLAYING:
-            return RGB(0, 100, 0);      // 深绿色文字（高亮状态）
+            return RGB(0, 100, 0);      // 深绿色（高亮）
         case PlaybackStatus::PLAYED:
-            return RGB(34, 139, 34);    // 森林绿文字
+            return RGB(34, 139, 34);    // 森林绿
         case PlaybackStatus::SKIPPED:
-            return RGB(128, 128, 128);  // 灰色文字
+            return RGB(128, 128, 128);  // 灰色
         default:
-            return RGB(0, 0, 0);        // 默认黑色
+            return RGB(0, 0, 0);
     }
 }
 

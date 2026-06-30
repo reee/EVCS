@@ -1,5 +1,6 @@
 #include "ConfigManager.h"
-#include <fstream>
+#include "Subject.h"
+#include "PathUtil.h"
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
@@ -75,7 +76,7 @@ bool ConfigManager::loadConfig(const std::wstring& filePath) {
             if (!currentSection.empty()) {
                 SubjectFullConfig& config = m_subjectConfigs[currentSection];
                 config.subjectInfo.name = currentSection;
-                config.subjectInfo.durationMinutes = 90;  // 默认值
+                config.subjectInfo.durationMinutes = Subject::DEFAULT_DURATION_MINUTES;
             }
             continue;
         }
@@ -91,7 +92,7 @@ bool ConfigManager::loadConfig(const std::wstring& filePath) {
                     try {
                         config.subjectInfo.durationMinutes = std::stoi(value);
                     } catch (...) {
-                        // 解析失败，保持默认值
+                        config.subjectInfo.durationMinutes = Subject::DEFAULT_DURATION_MINUTES;
                     }
                 } else {
                     // 解析为指令模板，key是时间偏移，value是指令信息
@@ -108,13 +109,7 @@ bool ConfigManager::loadConfig(const std::wstring& filePath) {
 }
 
 std::wstring ConfigManager::getDefaultConfigPath() const {
-    // 获取可执行文件所在目录
-    wchar_t exePath[MAX_PATH];
-    GetModuleFileNameW(NULL, exePath, MAX_PATH);
-
-    // 获取可执行文件所在目录
-    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-    return (exeDir / "config" / "default.ini").wstring();
+    return PathUtil::getConfigPath(L"default.ini").wstring();
 }
 
 std::vector<SubjectConfig> ConfigManager::getSubjects() const {

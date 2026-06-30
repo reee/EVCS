@@ -2,9 +2,9 @@
 #include <string>
 #include <vector>
 #include <chrono>
-#include <windows.h>  // 添加此行以支持COLORREF类型
+#include <windows.h>  // COLORREF
 #include "Subject.h"
-#include <filesystem> // 添加此行以支持 std::filesystem::exists
+#include <filesystem>
 
 // 指令播放状态枚举
 enum class PlaybackStatus {
@@ -15,19 +15,22 @@ enum class PlaybackStatus {
 };
 
 struct Instruction {
-    int subjectId;  // 改为使用科目ID而不是科目名称
-    std::string subjectName;  // 保留科目名称用于显示
+    int subjectId;
+    std::string subjectName;  // 显示用科目名称
     std::string name;
     std::chrono::system_clock::time_point playTime;
     std::string audioFile;
-    PlaybackStatus status;  // 添加播放状态字段
+    PlaybackStatus status;
 
-    // 构造函数，默认状态为未播放
-    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED) {}static std::vector<Instruction> generateInstructions(const Subject& subject);
+    // 缓存的音频时长（秒）。<=0 表示未取或取失败
+    mutable double cachedDurationSeconds = 0.0;
+
+    Instruction() : subjectId(0), status(PlaybackStatus::UNPLAYED) {}
+
+    static std::vector<Instruction> generateInstructions(const Subject& subject);
     std::string getPlayDateTimeString() const;
-    bool shouldPlayNow() const;
-    bool checkAudioFileExists() const; // 检查音频文件是否存在的方法
-    
-    COLORREF getStatusTextColor() const;  // 获取状态对应的文本颜色
+    bool checkAudioFileExists() const;
+
+    COLORREF getStatusTextColor() const;
     std::string getStatusString() const;
 };
